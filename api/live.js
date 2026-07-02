@@ -35,8 +35,9 @@ module.exports = async (req, res) => {
       const bracket = bracketFase
         ? t.wedstrijden
             .filter((w) => w.fase === bracketFase.id)
+            .sort((a, b) => (a.ronde - b.ronde) || ((a.koIndex || 0) - (b.koIndex || 0)))
             .map((w) => ({
-              ronde: w.ronde,
+              ronde: w.ronde, label: w.label || null,
               thuis: naam(w.thuis), uit: naam(w.uit),
               score: w.score, status: w.status,
             }))
@@ -49,7 +50,7 @@ module.exports = async (req, res) => {
       .filter((w) => w.baan && w.tijd)
       .sort((a, b) => String(a.tijd).localeCompare(String(b.tijd)))
       .map((w) => ({
-        divisie: w.divisie, groep: w.groep,
+        divisie: w.divisie, groep: w.groep, label: w.label || null,
         baan: w.baan, tijd: w.tijd,
         thuis: naam(w.thuis), uit: naam(w.uit),
         score: w.score, status: w.status,

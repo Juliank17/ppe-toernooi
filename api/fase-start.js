@@ -23,9 +23,11 @@ module.exports = async (req, res) => {
     const bracketFase = divisie.fases.find((f) => f.type === 'bracket');
     if (!bracketFase) return json(res, 400, { fout: 'Geen knock-outfase in deze divisie' });
 
-    // Terugdraaien: bracket-wedstrijden weghalen (uitslagen elders blijven staan)
+    // Terugdraaien: knock-out leegmaken maar het skelet (en de planning) behouden
     if (terug) {
-      t.wedstrijden = (t.wedstrijden || []).filter((w) => w.fase !== bracketFase.id);
+      for (const w of t.wedstrijden || []) {
+        if (w.fase === bracketFase.id) { w.thuis = null; w.uit = null; w.score = null; w.status = 'gepland'; }
+      }
       bracketFase.gestart = false;
       await store.bewaarToernooi(t);
       return json(res, 200, { ok: true, teruggedraaid: true });
@@ -58,16 +60,24 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Eerste ronde opbouwen uit opeenvolgende slots
-    t.wedstrijden = t.wedstrijden.filter((w) => w.fase !== bracketFase.id);
-    for (let i = 0; i < grootte; i += 2) {
-      t.wedstrijden.push({
-        id: uid(),
-        divisie: divisieId, fase: bracketFase.id, groep: 'bracket', ronde: 1,
-        thuis: slots[i], uit: slots[i + 1],
-        baan: null, tijd: null, scheidsrechter: null,
-        score: null, status: 'gepland',
-      });
+    // Eerste ronde invullen. Bij voorkeur in het bestaande skelet (behoudt de planning);
+    // bestaat er nog geen skelet, dan maken we de ronde-1 wedstrijden alsnog aan.
+    const ronde1 = t.wedstrijden
+      .filter((w) => w.fase === bracketFase.id && w.ronde === 1)
+      .sort((a, b) => (a.koIndex || 0) - (b.koIndex || 0));
+
+    if (ronde1.length) {
+      ronde1.forEach((w, i) => { w.thuis = slots[i * 2]; w.uit = slots[i * 2 + 1]; });
+    } else {
+      for (let i = 0; i < grootte; i += 2) {
+        t.wedstrijden.push({
+          id: uid(),
+          divisie: divisieId, fase: bracketFase.id, groep: 'ko', ronde: 1, koIndex: i / 2,
+          thuis: slots[i], uit: slots[i + 1],
+          baan: null, tijd: null, scheidsrechter: null,
+          score: null, status: 'gepland',
+        });
+      }
     }
     bracketFase.gestart = true;
 

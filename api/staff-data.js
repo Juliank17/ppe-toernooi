@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
         knockoutGestart: (d.fases.find((f) => f.type === 'bracket') || {}).gestart || false,
       })),
       wedstrijden: (t.wedstrijden || []).map((w) => ({
-        id: w.id, divisie: w.divisie, groep: w.groep, ronde: w.ronde,
+        id: w.id, divisie: w.divisie, groep: w.groep, ronde: w.ronde, label: w.label || null,
         thuis: naam(w.thuis), uit: naam(w.uit),
         baan: w.baan, tijd: w.tijd, score: w.score, status: w.status,
       })),
