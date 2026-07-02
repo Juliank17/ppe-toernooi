@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
 
     return json(res, 200, {
       id: t.id, naam: t.naam, slug: t.slug,
-      teams: (t.teams || []).map((x) => ({ id: x.id, naam: x.naam, divisie: x.divisie })),
+      teams: (t.teams || []).map((x) => ({ id: x.id, naam: x.naam, divisie: x.divisie, afwezig: !!x.afwezig })),
       divisies: (t.divisies || []).map((d) => ({
         id: d.id, naam: d.naam,
         poules: ((d.fases.find((f) => f.type === 'poule') || {}).poules || []).map((p) => ({ id: p.id, naam: p.naam })),
