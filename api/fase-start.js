@@ -5,7 +5,7 @@
 const store = require('../lib/store');
 const { magSchrijven } = require('../lib/auth');
 const { leesBody, json, uid, cfgVan } = require('../lib/http');
-const { teamOpPositie } = require('../lib/tournament');
+const { teamOpPositie, kwalificatieVolgorde, seedVolgorde } = require('../lib/tournament');
 
 module.exports = async (req, res) => {
   try {
@@ -34,15 +34,28 @@ module.exports = async (req, res) => {
     const cfg = cfgVan(t);
     const grootte = bracketFase.grootte || 8;
     const slots = new Array(grootte).fill(null);
+    const pouleMatches = pouleFase ? t.wedstrijden.filter((w) => w.fase === pouleFase.id) : [];
 
-    // Doorstroomregels toepassen: "pA#1" → team dat 1e staat in poule A
-    for (const regel of bracketFase.doorstroom || []) {
-      const [groepId, posStr] = String(regel.van).split('#');
-      const pos = Number(posStr);
-      const poule = pouleFase.poules.find((p) => p.id === groepId);
-      if (!poule) continue;
-      const pouleMatches = t.wedstrijden.filter((w) => w.fase === pouleFase.id && w.groep === groepId);
-      slots[regel.slot] = teamOpPositie(poule.teams, pouleMatches, cfg, pos);
+    if (bracketFase.doorstroom && bracketFase.doorstroom.length && bracketFase.kwalificatie !== 'beste') {
+      // Expliciete doorstroomregels: "pA#1" → team dat 1e staat in poule A
+      for (const regel of bracketFase.doorstroom) {
+        const [groepId, posStr] = String(regel.van).split('#');
+        const pos = Number(posStr);
+        const poule = pouleFase.poules.find((p) => p.id === groepId);
+        if (!poule) continue;
+        const pm = pouleMatches.filter((w) => w.groep === groepId);
+        slots[regel.slot] = teamOpPositie(poule.teams, pm, cfg, pos);
+      }
+    } else if (pouleFase) {
+      // Beste geplaatsten over alle poules: alle #1, dan alle #2, dan beste #3, enz.
+      const qualifiers = kwalificatieVolgorde(pouleFase.poules, pouleMatches, cfg, grootte);
+      const order = seedVolgorde(grootte);
+      const slotVoorSeed = {};
+      order.forEach((s, i) => (slotVoorSeed[s] = i));
+      qualifiers.forEach((team, k) => {
+        const seed = k + 1;
+        if (seed <= grootte) slots[slotVoorSeed[seed]] = team;
+      });
     }
 
     // Eerste ronde opbouwen uit opeenvolgende slots
