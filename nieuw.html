@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Toernooi — Nieuw toernooi</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .layout { display:grid; grid-template-columns: 240px 1fr; gap:16px; }
+  @media (max-width:760px){ .layout{ grid-template-columns:1fr; } }
+  .checklist { position:sticky; top:16px; align-self:start; }
+  .checklist ol { list-style:none; margin:0; padding:0; }
+  .checklist li { padding:9px 10px; border-radius:8px; font-size:.85rem; color:var(--grijs-2); cursor:pointer; display:flex; gap:8px; align-items:center; }
+  .checklist li .bol { width:18px; height:18px; border-radius:50%; border:2px solid var(--grijs-2); display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; flex:0 0 auto; }
+  .checklist li.actief { background:var(--navy-2); color:#fff; }
+  .checklist li.klaar .bol { background:var(--lime); border-color:var(--lime); color:var(--navy); }
+  .checklist li.klaar { color:#fff; }
+  .stap { display:none; }
+  .stap.actief { display:block; }
+  .navbtns { display:flex; justify-content:space-between; margin-top:14px; }
+  .baanrij, .divrij { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+  .baanrij input, .divrij input { flex:1; }
+  .weg { background:var(--rood); color:#fff; border:0; border-radius:6px; padding:8px 10px; cursor:pointer; }
+  .keuze { display:flex; gap:10px; flex-wrap:wrap; }
+  .keuze label { flex:1; min-width:150px; border:2px solid var(--grijs); border-radius:10px; padding:12px; cursor:pointer; color:var(--navy); text-transform:none; margin:0; }
+  .keuze label.gekozen { border-color:var(--lime); background:#f7fce0; }
+  .keuze input { display:none; }
+  .keuze b { display:block; font-family:'Anton'; }
+</style>
+</head>
+<body>
+<header class="kop">
+  <div class="logo">PRIME PADEL EVENTS · NIEUW TOERNOOI</div>
+  <h1>Toernooi opzetten</h1>
+  <div class="sub">Stap voor stap — genereren kan pas als alles compleet is</div>
+</header>
+
+<div class="wrap layout">
+  <!-- Checklist -->
+  <div class="kaart checklist">
+    <h3>Checklist</h3>
+    <ol id="checklist"></ol>
+    <div id="sleutelwaarschuwing" class="mini" style="color:#c00"></div>
+  </div>
+
+  <!-- Stappen -->
+  <div>
+    <!-- 1. Basis -->
+    <div class="stap kaart" data-stap="0">
+      <h2>1. Basisgegevens</h2>
+      <label>Naam van het toernooi</label><input id="b_naam" oninput="autoSlug()" placeholder="Prime Padel x TopSpin">
+      <div class="rij">
+        <div><label>Slug (URL)</label><input id="b_slug" placeholder="prime25april"></div>
+        <div><label>Datum</label><input id="b_datum" type="date"></div>
+      </div>
+      <div class="rij">
+        <div><label>Locatie</label><input id="b_locatie" placeholder="TopSpin Plaza"></div>
+        <div><label>Personeel-PIN</label><input id="b_pin" placeholder="bv. 2468"></div>
+      </div>
+    </div>
+
+    <!-- 2. Vorm -->
+    <div class="stap kaart" data-stap="1">
+      <h2>2. Toernooivorm</h2>
+      <p class="mini" style="color:#5b6b82">Hoe spelen de teams? Dit geldt voor alle niveaus.</p>
+      <div class="keuze" id="vormkeuze">
+        <label class="gekozen"><input type="radio" name="vorm" value="poule_ko" checked><b>Poules + knock-out</b>Eerst poules, daarna vallen de besten af in een knock-out. <span class="mini">(jullie standaard)</span></label>
+        <label><input type="radio" name="vorm" value="poule"><b>Alleen poules</b>Iedereen speelt in poules, eindstand bepaalt de winnaar.</label>
+        <label><input type="radio" name="vorm" value="ko"><b>Alleen knock-out</b>Direct afvalsysteem zonder poules.</label>
+      </div>
+    </div>
+
+    <!-- 3. Niveaus -->
+    <div class="stap kaart" data-stap="2">
+      <h2>3. Niveaus / divisies</h2>
+      <p class="mini" style="color:#5b6b82">Bijv. Beginner, Beginner+, Intermediate. Eén niveau mag ook.</p>
+      <div id="divisies"></div>
+      <button class="btn sec" onclick="voegDivisieToe()">+ Niveau toevoegen</button>
+    </div>
+
+    <!-- 4. Banen -->
+    <div class="stap kaart" data-stap="3">
+      <h2>4. Banen</h2>
+      <div class="rij">
+        <div><label>Aantal banen</label><input id="baanAantal" type="number" min="1" value="4"></div>
+        <div><label>Standaard starttijd</label><input id="baanStart" type="time" value="10:00"></div>
+        <button class="btn sec" style="flex:0" onclick="maakBanen()">Maak banen</button>
+      </div>
+      <div id="banen" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 5. Wedstrijdinstellingen -->
+    <div class="stap kaart" data-stap="4">
+      <h2>5. Wedstrijdinstellingen</h2>
+      <div class="rij">
+        <div><label>Wedstrijdduur (min)</label><input id="w_duur" type="number" min="5" value="20"></div>
+        <div><label>Wisseltijd (min)</label><input id="w_wissel" type="number" min="0" value="5"></div>
+      </div>
+      <div class="rij">
+        <div><label>Punten winst</label><input id="p_winst" type="number" value="3"></div>
+        <div><label>Punten gelijk</label><input id="p_gelijk" type="number" value="1"></div>
+        <div><label>Punten verlies</label><input id="p_verlies" type="number" value="0"></div>
+      </div>
+      <label>Tiebreakers (volgorde, komma-gescheiden)</label>
+      <input id="w_tb" value="punten, onderling, saldo, voor, gewonnen">
+      <p class="mini" style="color:#5b6b82">Opties: punten, onderling (head-to-head), saldo, voor, gewonnen, tegen, gemiddeld.</p>
+      <label><input type="checkbox" id="w_iter" checked style="width:auto"> Head-to-head iteratief toepassen (UEFA-stijl)</label>
+    </div>
+
+    <!-- 6. Teams -->
+    <div class="stap kaart" data-stap="5">
+      <h2>6. Teams &amp; poule-indeling</h2>
+      <p class="mini" style="color:#5b6b82">Plak per niveau de teamnamen (één per regel). Kies in hoeveel poules ze verdeeld worden; teams worden automatisch verdeeld (aanpassen kan later).</p>
+      <div id="teamsPerDivisie"></div>
+    </div>
+
+    <!-- 7. Controle -->
+    <div class="stap kaart" data-stap="6">
+      <h2>7. Controle &amp; genereren</h2>
+      <div id="samenvatting" class="mini" style="color:#5b6b82"></div>
+      <div id="genmelding"></div>
+      <button class="btn" id="genknop" onclick="aanmakenEnGenereren()">Toernooi aanmaken &amp; wedstrijden genereren</button>
+      <div id="klaarlinks" class="mini" style="margin-top:10px"></div>
+    </div>
+
+    <div class="navbtns">
+      <button class="btn sec" onclick="ganaar(stap-1)" id="vorige">Vorige</button>
+      <button class="btn" onclick="ganaar(stap+1)" id="volgende">Volgende</button>
+    </div>
+  </div>
+</div>
+
+<footer class="vt">Na aanmaken beheer je alles verder via <a href="/admin.html">Beheer</a>.</footer>
+
+<script>
+const STAPPEN = ['Basis','Vorm','Niveaus','Banen','Wedstrijd','Teams','Controle'];
+let stap = 0;
+let divCount = 0;
+const getKey = () => localStorage.getItem('ppe_key') || '';
+
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function el(id){ return document.getElementById(id); }
+function letters(i){ return String.fromCharCode(65+i); }
+function vorm(){ const r=document.querySelector('input[name=vorm]:checked'); return r?r.value:'poule_ko'; }
+
+/* ---- Navigatie + checklist ---- */
+function tekenChecklist(){
+  el('checklist').innerHTML = STAPPEN.map((naam,i)=>`
+    <li class="${i===stap?'actief':''} ${stapCompleet(i)?'klaar':''}" onclick="ganaar(${i})">
+      <span class="bol">${stapCompleet(i)?'✓':i+1}</span>${naam}</li>`).join('');
+  el('sleutelwaarschuwing').textContent = getKey() ? '' : 'Let op: interne sleutel ontbreekt — stel die eerst in via Beheer.';
+}
+function ganaar(n){
+  if(n<0||n>=STAPPEN.length) return;
+  stap=n;
+  document.querySelectorAll('.stap').forEach(s=>s.classList.toggle('actief', +s.dataset.stap===stap));
+  el('vorige').style.visibility = stap===0?'hidden':'visible';
+  el('volgende').style.visibility = stap===STAPPEN.length-1?'hidden':'visible';
+  if(stap===5) bouwTeamvelden();
+  if(stap===6) toonSamenvatting();
+  tekenChecklist();
+}
+
+/* ---- Stap-validatie ---- */
+function stapCompleet(i){
+  switch(i){
+    case 0: return el('b_naam').value.trim() && el('b_slug').value.trim();
+    case 1: return true;
+    case 2: return leesDivisies().length>0;
+    case 3: return leesBanen().length>0;
+    case 4: return true;
+    case 5: return leesDivisies().every(d=>{ const ta=el('td_'+d.id); return ta && ta.value.trim(); });
+    case 6: return false;
+  }
+}
+
+/* ---- Stap 1 ---- */
+function autoSlug(){
+  if(el('b_slug').dataset.touched) return;
+  el('b_slug').value = el('b_naam').value.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,24);
+}
+el('b_slug').addEventListener('input',()=> el('b_slug').dataset.touched='1');
+document.querySelectorAll('input[name=vorm]').forEach(r=>r.onchange=()=>{
+  document.querySelectorAll('#vormkeuze label').forEach(l=>l.classList.toggle('gekozen', l.querySelector('input').checked));
+});
+
+/* ---- Stap 3: divisies ---- */
+function voegDivisieToe(naam){
+  const id = 'd'+(++divCount);
+  const div = document.createElement('div');
+  div.className='divrij'; div.dataset.id=id;
+  div.innerHTML = `<input value="${esc(naam||'')}" placeholder="Naam niveau (bv. Beginner)">
+    <button class="weg" onclick="this.parentNode.remove(); tekenChecklist();">×</button>`;
+  el('divisies').appendChild(div);
+  tekenChecklist();
+}
+function leesDivisies(){
+  return [...document.querySelectorAll('#divisies .divrij')]
+    .map(r=>({id:r.dataset.id, naam:r.querySelector('input').value.trim()}))
+    .filter(d=>d.naam);
+}
+
+/* ---- Stap 4: banen ---- */
+function maakBanen(){
+  const n = Math.max(1, +el('baanAantal').value||1);
+  const start = el('baanStart').value||'10:00';
+  el('banen').innerHTML = Array.from({length:n},(_, i)=>`
+    <div class="baanrij" data-id="b${i+1}">
+      <input value="Baan ${i+1}" style="flex:2">
+      <select style="flex:1"><option value="indoor">indoor</option><option value="outdoor">outdoor</option></select>
+      <input type="time" value="${start}" style="flex:1">
+    </div>`).join('');
+  tekenChecklist();
+}
+function leesBanen(){
+  return [...document.querySelectorAll('#banen .baanrij')].map(r=>{
+    const [naam, type, tijd] = r.querySelectorAll('input,select');
+    return { id:r.dataset.id, naam:naam.value.trim(), type:type.value, starttijd:tijd.value };
+  }).filter(b=>b.naam);
+}
+
+/* ---- Stap 6: teams ---- */
+function bouwTeamvelden(){
+  const heeftKO = vorm()!=='poule';
+  const heeftPoule = vorm()!=='ko';
+  el('teamsPerDivisie').innerHTML = leesDivisies().map(d=>`
+    <div class="kaart" style="background:#f6f8fc">
+      <h3>${esc(d.naam)}</h3>
+      <label>Teams (één per regel)</label>
+      <textarea id="td_${d.id}" rows="6" placeholder="Team 1&#10;Team 2&#10;Team 3&#10;Team 4" oninput="tekenChecklist()"></textarea>
+      <div class="rij">
+        ${heeftPoule?`<div><label>Aantal poules</label><input id="tp_${d.id}" type="number" min="1" value="1"></div>`:''}
+        ${heeftKO?`<div><label>Gaan door per poule</label><input id="tk_${d.id}" type="number" min="1" value="2"></div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+/* ---- Opbouw tournooi-object ---- */
+function seedVolgorde(grootte){
+  let ronde=[1,2];
+  while(ronde.length<grootte){ const v=[],som=ronde.length*2+1; for(const s of ronde){v.push(s);v.push(som-s);} ronde=v; }
+  return ronde;
+}
+let teamTeller=0;
+function bouwToernooi(){
+  const divisies=[], teams=[];
+  for(const d of leesDivisies()){
+    const namen = (el('td_'+d.id).value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const ids = namen.map(n=>{ const id='tm'+(++teamTeller); teams.push({id,naam:n,divisie:d.id}); return id; });
+    const fases=[];
+    const heeftPoule = vorm()!=='ko';
+    const heeftKO = vorm()!=='poule';
+
+    let poules=[];
+    if(heeftPoule){
+      const aantal = Math.max(1, +(el('tp_'+d.id)?.value)||1);
+      poules = Array.from({length:aantal},(_,i)=>({id:d.id+'_p'+letters(i), naam:'Poule '+letters(i), teams:[]}));
+      ids.forEach((t,i)=> poules[i%aantal].teams.push(t));
+      fases.push({id:d.id+'_poule', type:'poule', poules});
+    }
+    if(heeftKO){
+      let doorstroom=[], grootte;
+      if(heeftPoule){
+        const doorPer = Math.max(1, +(el('tk_'+d.id)?.value)||1);
+        const quals=[];
+        for(let pos=1; pos<=doorPer; pos++) for(const p of poules) quals.push(p.id+'#'+pos);
+        grootte=1; while(grootte<quals.length) grootte*=2;
+        const order=seedVolgorde(grootte), slotVoorSeed={}; order.forEach((seed,idx)=>slotVoorSeed[seed]=idx);
+        quals.forEach((q,k)=>{ const seed=k+1; if(seed<=grootte) doorstroom.push({van:q, slot:slotVoorSeed[seed]}); });
+      } else {
+        grootte=1; while(grootte<ids.length) grootte*=2;
+        const order=seedVolgorde(grootte), slotVoorSeed={}; order.forEach((seed,idx)=>slotVoorSeed[seed]=idx);
+        ids.forEach((t,k)=>{ const seed=k+1; if(seed<=grootte) doorstroom.push({van:'direct:'+t, slot:slotVoorSeed[seed]}); });
+      }
+      fases.push({id:d.id+'_ko', type:'bracket', grootte, doorstroom});
+    }
+    divisies.push({id:d.id, naam:d.naam, fases});
+  }
+
+  return {
+    naam: el('b_naam').value.trim(),
+    slug: el('b_slug').value.trim(),
+    datum: el('b_datum').value,
+    locatie: el('b_locatie').value.trim(),
+    personeelspin: el('b_pin').value.trim(),
+    status:'concept',
+    banen: leesBanen(),
+    wedstrijdduur: +el('w_duur').value||20,
+    wisseltijd: +el('w_wissel').value||5,
+    scoreType:'punten',
+    punten:{ winst:+el('p_winst').value, gelijk:+el('p_gelijk').value, verlies:+el('p_verlies').value },
+    tiebreakers: el('w_tb').value.split(',').map(s=>s.trim()).filter(Boolean),
+    h2hIteratief: el('w_iter').checked,
+    divisies, teams, wedstrijden:[],
+  };
+}
+
+function toonSamenvatting(){
+  const t = bouwToernooi();
+  const regels = [
+    `<strong>${esc(t.naam||'(geen naam)')}</strong> — ${esc(t.datum||'?')} · ${esc(t.locatie||'?')}`,
+    `Vorm: ${vorm()==='poule_ko'?'poules + knock-out':vorm()==='poule'?'alleen poules':'alleen knock-out'}`,
+    `Banen: ${t.banen.length} · wedstrijdduur ${t.wedstrijdduur}m + ${t.wisseltijd}m wissel`,
+    `Niveaus: ${t.divisies.map(d=>esc(d.naam)+' ('+t.teams.filter(x=>x.divisie===d.id).length+' teams)').join(', ')||'—'}`,
+    `Personeel-PIN: ${t.personeelspin?'ingesteld':'<span style="color:#c00">nog niet ingesteld</span>'}`,
+  ];
+  el('samenvatting').innerHTML = regels.map(r=>'• '+r).join('<br>');
+}
+
+/* ---- Aanmaken + genereren ---- */
+function melding(id,t,ok){ el(id).innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${t}</div>`:''; }
+async function aanmakenEnGenereren(){
+  if(!getKey()){ melding('genmelding','Interne sleutel ontbreekt — stel die in via Beheer.',false); return; }
+  const t = bouwToernooi();
+  if(!t.naam||!t.slug){ melding('genmelding','Naam en slug zijn verplicht (stap 1).',false); return; }
+  el('genknop').disabled=true;
+  const hdr={'Content-Type':'application/json','x-internal-key':getKey()};
+  try{
+    let r = await fetch('/api/toernooi',{method:'POST',headers:hdr,body:JSON.stringify(t)});
+    let j = await r.json();
+    if(!r.ok){ melding('genmelding',j.fout||'Aanmaken mislukt',false); el('genknop').disabled=false; return; }
+    const id=j.id;
+    // Poulewedstrijden genereren per divisie (indien poulefase)
+    let totaal=0;
+    for(const d of t.divisies){
+      const pf = d.fases.find(f=>f.type==='poule');
+      if(!pf) continue;
+      const g = await fetch('/api/genereer',{method:'POST',headers:hdr,body:JSON.stringify({id,divisieId:d.id,faseId:pf.id})});
+      const gj = await g.json(); if(g.ok) totaal += gj.aantal||0;
+    }
+    melding('genmelding',`Toernooi aangemaakt en ${totaal} poulewedstrijden gegenereerd.`,true);
+    el('klaarlinks').innerHTML =
+      `Live: <a href="/live/${encodeURIComponent(t.slug)}">/live/${esc(t.slug)}</a> · `+
+      `Personeel: <a href="/staff/${encodeURIComponent(t.slug)}">/staff/${esc(t.slug)}</a> · `+
+      `<a href="/admin.html">Beheer</a>`;
+  }catch(e){ melding('genmelding','Fout: '+e.message,false); }
+  el('genknop').disabled=false;
+}
+
+/* init */
+voegDivisieToe('Hoofdtoernooi');
+maakBanen();
+ganaar(0);
+</script>
+</body>
+</html>

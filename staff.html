@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Toernooi — Personeel</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="kop">
+  <div class="logo">PRIME PADEL EVENTS · PERSONEEL</div>
+  <h1 id="titel">Personeel</h1>
+  <div class="sub" id="subtitel"></div>
+</header>
+
+<div class="wrap">
+  <!-- Inloggen -->
+  <div id="login" class="kaart verborgen">
+    <h2>Inloggen met personeelscode</h2>
+    <label>Code (PIN)</label>
+    <input id="pin" type="password" inputmode="numeric" placeholder="••••">
+    <div id="loginmelding"></div>
+    <button class="btn" onclick="login()">Inloggen</button>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="verborgen">
+    <div class="tabs">
+      <button data-tab="scores" class="actief">Scores</button>
+      <button data-tab="aanmelden">Aanmelden</button>
+      <button data-tab="rondes">Rondes</button>
+    </div>
+
+    <div id="tab-scores">
+      <div class="kaart">
+        <div class="rij">
+          <div><label>Filter</label>
+            <select id="filter" onchange="tekenScores()">
+              <option value="open">Alleen nog in te vullen</option>
+              <option value="alle">Alle wedstrijden</option>
+            </select></div>
+        </div>
+      </div>
+      <div id="scorelijst"></div>
+    </div>
+
+    <div id="tab-aanmelden" class="verborgen">
+      <div class="kaart">
+        <h3>Nieuw team aanmelden</h3>
+        <label>Teamnaam</label><input id="a_naam" placeholder="bv. Jan & Piet">
+        <label>Spelers (komma-gescheiden)</label><input id="a_spelers" placeholder="Jan, Piet">
+        <div class="rij">
+          <div><label>Divisie / niveau</label><select id="a_divisie" onchange="vulPoules()"></select></div>
+          <div><label>Poule (optioneel)</label><select id="a_poule"></select></div>
+        </div>
+        <div id="aanmeldmelding"></div>
+        <button class="btn" onclick="aanmelden()">Aanmelden</button>
+      </div>
+    </div>
+
+    <div id="tab-rondes" class="verborgen">
+      <div id="rondelijst"></div>
+    </div>
+  </div>
+</div>
+
+<footer class="vt">Personeel-modus · toegang vervalt automatisch na de dag</footer>
+
+<script>
+const slug = new URLSearchParams(location.search).get('slug')
+  || location.pathname.split('/').filter(Boolean).pop();
+let DATA = null;
+
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toon(id,on){ document.getElementById(id).classList.toggle('verborgen',!on); }
+function melding(el,tekst,ok){ el.innerHTML = tekst?`<div class="melding ${ok?'ok':'fout'}">${esc(tekst)}</div>`:''; }
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
+  ['scores','aanmelden','rondes'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
+});
+
+async function laadData(){
+  const r = await fetch('/api/staff-data?slug='+encodeURIComponent(slug));
+  if(r.status===401){ toon('login',true); toon('app',false); return; }
+  if(!r.ok){ document.getElementById('titel').textContent='Toernooi niet gevonden'; return; }
+  DATA = await r.json();
+  document.getElementById('titel').textContent = DATA.naam;
+  toon('login',false); toon('app',true);
+  vulDivisies(); tekenScores(); tekenRondes();
+}
+
+async function login(){
+  const el = document.getElementById('loginmelding');
+  const r = await fetch('/api/staff-login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slug,pin:document.getElementById('pin').value})});
+  const j = await r.json();
+  if(r.ok){ melding(el,'',true); laadData(); } else { melding(el,j.fout||'Mislukt',false); }
+}
+
+/* --- Scores --- */
+function tekenScores(){
+  const filter = document.getElementById('filter').value;
+  let ws = DATA.wedstrijden.slice();
+  if(filter==='open') ws = ws.filter(w=>w.status!=='klaar');
+  ws.sort((a,b)=>String(a.tijd||'').localeCompare(String(b.tijd||'')));
+  document.getElementById('scorelijst').innerHTML = '<div class="kaart">'+ (ws.length?ws.map(w=>`
+    <div class="wed">
+      <div><div class="meta">${esc(w.baan||'baan n.t.b.')} ${w.tijd?'· '+esc(w.tijd):''} · ${esc(w.groep)}</div>
+        <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input style="width:52px" type="number" min="0" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}">
+        <input style="width:52px" type="number" min="0" id="s_u_${w.id}" value="${w.score?w.score.uit:''}">
+        <button class="btn" style="margin:0;padding:8px 10px" onclick="bewaarScore('${w.id}')">✓</button>
+      </div>
+    </div>`).join('') : 'Geen wedstrijden.') + '</div>';
+}
+
+async function bewaarScore(wid){
+  const t = document.getElementById('s_t_'+wid).value;
+  const u = document.getElementById('s_u_'+wid).value;
+  if(t===''||u==='') return;
+  const r = await fetch('/api/score',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:DATA.id,wedstrijdId:wid,score:{thuis:+t,uit:+u}})});
+  if(r.ok) laadData();
+}
+
+/* --- Aanmelden --- */
+function vulDivisies(){
+  const sel = document.getElementById('a_divisie');
+  sel.innerHTML = DATA.divisies.map(d=>`<option value="${d.id}">${esc(d.naam)}</option>`).join('');
+  vulPoules();
+}
+function vulPoules(){
+  const d = DATA.divisies.find(x=>x.id===document.getElementById('a_divisie').value);
+  document.getElementById('a_poule').innerHTML =
+    '<option value="">— geen —</option>' + (d?d.poules.map(p=>`<option value="${p.id}">${esc(p.naam)}</option>`).join(''):'');
+}
+async function aanmelden(){
+  const el = document.getElementById('aanmeldmelding');
+  const team = {
+    naam: document.getElementById('a_naam').value,
+    spelers: document.getElementById('a_spelers').value.split(',').map(s=>s.trim()).filter(Boolean),
+    divisie: document.getElementById('a_divisie').value,
+    poule: document.getElementById('a_poule').value || null,
+  };
+  if(!team.naam){ melding(el,'Teamnaam verplicht',false); return; }
+  const r = await fetch('/api/deelnemer',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:DATA.id,team})});
+  const j = await r.json();
+  if(r.ok){ melding(el,'Aangemeld: '+team.naam,true); document.getElementById('a_naam').value=''; document.getElementById('a_spelers').value=''; laadData(); }
+  else melding(el,j.fout||'Mislukt',false);
+}
+
+/* --- Rondes --- */
+function tekenRondes(){
+  const ds = DATA.divisies.filter(d=>d.heeftKnockout);
+  document.getElementById('rondelijst').innerHTML = ds.length? ds.map(d=>`
+    <div class="kaart"><h3>${esc(d.naam)}</h3>
+      <p class="mini">${d.knockoutGestart?'Knock-outfase is gestart.':'Poulefase loopt nog.'}</p>
+      ${d.knockoutGestart
+        ? `<button class="btn sec" onclick="fase('${d.id}',true)">Terugdraaien</button>`
+        : `<button class="btn" onclick="fase('${d.id}',false)">Start knock-outfase</button>`}
+    </div>`).join('') : '<div class="kaart">Geen knock-outfase in dit toernooi.</div>';
+}
+async function fase(divisieId,terug){
+  if(!terug && !confirm('Knock-outfase starten op basis van de huidige eindstanden?')) return;
+  const r = await fetch('/api/fase-start',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:DATA.id,divisieId,terug})});
+  if(r.ok) laadData(); else { const j=await r.json(); alert(j.fout||'Mislukt'); }
+}
+
+laadData();
+</script>
+</body>
+</html>

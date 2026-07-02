@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Toernooi — Beheer</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="kop">
+  <div class="logo">PRIME PADEL EVENTS · BEHEER</div>
+  <h1>Toernooibeheer</h1>
+</header>
+
+<div class="wrap">
+  <!-- Sleutel -->
+  <div class="kaart">
+    <label>Interne sleutel (INTERNAL_KEY)</label>
+    <div class="rij">
+      <input id="key" type="password" placeholder="wordt lokaal onthouden">
+      <button class="btn" style="flex:0" onclick="bewaarKey()">Onthoud</button>
+    </div>
+    <div id="keymelding" class="mini"></div>
+  </div>
+
+  <!-- Overzicht -->
+  <div class="kaart">
+    <h2>Toernooien</h2>
+    <div id="overzicht" class="mini">Laden…</div>
+    <button class="btn sec" onclick="laadOverzicht()">Vernieuwen</button>
+  </div>
+
+  <!-- Nieuw -->
+  <div class="kaart">
+    <h2>Nieuw toernooi</h2>
+    <p class="mini" style="color:#5b6b82">Tip: gebruik de begeleide <a href="/nieuw.html">setup-wizard</a> om vorm, banen, niveaus en teams stap voor stap in te stellen. Hieronder is de snelle variant met voorbeeldstructuur.</p>
+    <div class="rij">
+      <div><label>Naam</label><input id="n_naam"></div>
+      <div><label>Slug (voor de URL)</label><input id="n_slug" placeholder="prime25april"></div>
+    </div>
+    <div class="rij">
+      <div><label>Datum</label><input id="n_datum" type="date"></div>
+      <div><label>Locatie</label><input id="n_locatie"></div>
+      <div><label>Personeel-PIN</label><input id="n_pin"></div>
+    </div>
+    <div id="nieuwmelding"></div>
+    <button class="btn" onclick="maakNieuw()">Aanmaken (met voorbeeldstructuur)</button>
+  </div>
+
+  <!-- Bewerken -->
+  <div class="kaart">
+    <h2>Bewerken</h2>
+    <div class="rij">
+      <div><label>Toernooi-id</label><input id="e_id"></div>
+      <button class="btn sec" style="flex:0" onclick="laadToernooi()">Openen</button>
+    </div>
+    <p class="mini" style="color:#5b6b82">Structuur (divisies, poules, teams, banen, puntentelling) als JSON. Pas aan en sla op. Een nettere UI komt later — dit geeft nu volledige controle.</p>
+    <textarea id="e_json" rows="18" style="font-family:monospace;font-size:.8rem"></textarea>
+    <div id="editmelding"></div>
+    <div class="rij">
+      <button class="btn" onclick="opslaan()">Opslaan</button>
+      <button class="btn sec" onclick="genereer()">Genereer poulewedstrijden</button>
+    </div>
+    <p class="mini" id="links"></p>
+  </div>
+</div>
+
+<footer class="vt">Alleen voor beheerders</footer>
+
+<script>
+const getKey = () => localStorage.getItem('ppe_key') || '';
+function hdr(){ return {'Content-Type':'application/json','x-internal-key':getKey()}; }
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function melding(id,t,ok){ document.getElementById(id).innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${esc(t)}</div>`:''; }
+
+function bewaarKey(){ localStorage.setItem('ppe_key',document.getElementById('key').value); document.getElementById('keymelding').textContent='Opgeslagen in deze browser.'; laadOverzicht(); }
+document.getElementById('key').value = getKey();
+
+async function laadOverzicht(){
+  try{
+    const r = await fetch('/api/toernooi',{headers:hdr()});
+    if(r.status===401){ document.getElementById('overzicht').innerHTML='<span style="color:#c00">Sleutel ontbreekt of onjuist.</span>'; return; }
+    const j = await r.json();
+    document.getElementById('overzicht').innerHTML = (j.toernooien||[]).map(t=>`
+      <div class="wed"><div><div class="teams">${esc(t.naam)}</div>
+        <div class="meta">${esc(t.datum)} · ${esc(t.status)} · id ${esc(t.id)}</div></div>
+        <div><a href="/live.html?slug=${encodeURIComponent(t.slug)}">live</a> ·
+             <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">personeel</a></div></div>`).join('') || 'Nog geen toernooien.';
+  }catch(e){ document.getElementById('overzicht').textContent='Fout bij laden.'; }
+}
+
+function voorbeeldStructuur(){
+  return {
+    banen: [{id:'b1',naam:'Baan 1',type:'indoor',starttijd:'10:00'},{id:'b2',naam:'Baan 2',type:'indoor',starttijd:'10:00'}],
+    wedstrijdduur:20, wisseltijd:5,
+    scoreType:'punten', punten:{winst:3,gelijk:1,verlies:0},
+    tiebreakers:['punten','onderling','saldo','voor','gewonnen'], h2hIteratief:true,
+    teams:[
+      {id:'tm1',naam:'Team 1',divisie:'d1'},{id:'tm2',naam:'Team 2',divisie:'d1'},
+      {id:'tm3',naam:'Team 3',divisie:'d1'},{id:'tm4',naam:'Team 4',divisie:'d1'}
+    ],
+    divisies:[{
+      id:'d1', naam:'Beginner',
+      fases:[
+        {id:'f_poule',type:'poule',poules:[{id:'pA',naam:'Poule A',teams:['tm1','tm2','tm3','tm4']}]},
+        {id:'f_ko',type:'bracket',grootte:2,doorstroom:[{van:'pA#1',slot:0},{van:'pA#2',slot:1}]}
+      ]
+    }]
+  };
+}
+
+async function maakNieuw(){
+  const body = Object.assign({
+    naam:document.getElementById('n_naam').value,
+    slug:document.getElementById('n_slug').value,
+    datum:document.getElementById('n_datum').value,
+    locatie:document.getElementById('n_locatie').value,
+    personeelspin:document.getElementById('n_pin').value,
+    status:'concept',
+  }, voorbeeldStructuur());
+  const r = await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(body)});
+  const j = await r.json();
+  if(r.ok){ melding('nieuwmelding','Aangemaakt — id '+j.id,true); document.getElementById('e_id').value=j.id; laadOverzicht(); laadToernooi(); }
+  else melding('nieuwmelding',j.fout||'Mislukt',false);
+}
+
+async function laadToernooi(){
+  const id = document.getElementById('e_id').value;
+  const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
+  if(!r.ok){ melding('editmelding','Niet gevonden',false); return; }
+  const t = await r.json();
+  document.getElementById('e_json').value = JSON.stringify(t,null,2);
+  document.getElementById('links').innerHTML =
+    `Live: <a href="/live.html?slug=${encodeURIComponent(t.slug)}">/live/${esc(t.slug)}</a> · `+
+    `Personeel: <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">/staff/${esc(t.slug)}</a>`;
+  melding('editmelding','',true);
+}
+
+async function opslaan(){
+  let obj;
+  try{ obj = JSON.parse(document.getElementById('e_json').value); }
+  catch(e){ melding('editmelding','Ongeldige JSON: '+e.message,false); return; }
+  const r = await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(obj)});
+  const j = await r.json();
+  if(r.ok){ melding('editmelding','Opgeslagen.',true); laadOverzicht(); }
+  else melding('editmelding',j.fout||'Mislukt',false);
+}
+
+async function genereer(){
+  let obj;
+  try{ obj = JSON.parse(document.getElementById('e_json').value); }catch(e){ melding('editmelding','Sla eerst geldige JSON op.',false); return; }
+  const div = (obj.divisies||[])[0];
+  const fase = div && (div.fases||[]).find(f=>f.type==='poule');
+  if(!fase){ melding('editmelding','Geen poulefase gevonden.',false); return; }
+  const r = await fetch('/api/genereer',{method:'POST',headers:hdr(),body:JSON.stringify({id:obj.id,divisieId:div.id,faseId:fase.id})});
+  const j = await r.json();
+  if(r.ok){ melding('editmelding',j.aantal+' wedstrijden gegenereerd.',true); laadToernooi(); }
+  else melding('editmelding',j.fout||'Mislukt',false);
+}
+
+laadOverzicht();
+</script>
+</body>
+</html>

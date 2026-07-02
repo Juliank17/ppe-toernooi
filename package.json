@@ -1,0 +1,9 @@
+{
+  "name": "ppe-toernooi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PPE Toernooisysteem — eigen toernooibeheer (Tournify-vervanger)",
+  "scripts": {
+    "test": "node test/tournament.test.js"
+  }
+}
