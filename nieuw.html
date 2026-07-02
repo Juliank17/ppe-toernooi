@@ -110,7 +110,7 @@
     <!-- 6. Teams -->
     <div class="stap kaart" data-stap="5">
       <h2>6. Teams &amp; poule-indeling</h2>
-      <p class="mini" style="color:#5b6b82">Plak per niveau de teamnamen (één per regel). Kies in hoeveel poules ze verdeeld worden; teams worden automatisch verdeeld (aanpassen kan later).</p>
+      <p class="mini" style="color:#5b6b82">Per niveau: kies het aantal teams en de poulegrootte (bv. 4 per poule) — de poules worden automatisch gemaakt. Teamnamen mag je nu invullen of later via de check-in. De wedstrijden worden bij "aanmaken &amp; genereren" aangemaakt.</p>
       <div id="teamsPerDivisie"></div>
     </div>
 
@@ -169,7 +169,7 @@ function stapCompleet(i){
     case 2: return leesDivisies().length>0;
     case 3: return leesBanen().length>0;
     case 4: return true;
-    case 5: return leesDivisies().every(d=>{ const ta=el('td_'+d.id); return ta && ta.value.trim(); });
+    case 5: return leesDivisies().every(d=> effTeams(d.id).length>=2);
     case 6: return false;
   }
 }
@@ -226,13 +226,39 @@ function bouwTeamvelden(){
   el('teamsPerDivisie').innerHTML = leesDivisies().map(d=>`
     <div class="kaart" style="background:#f6f8fc">
       <h3>${esc(d.naam)}</h3>
-      <label>Teams (één per regel)</label>
-      <textarea id="td_${d.id}" rows="6" placeholder="Team 1&#10;Team 2&#10;Team 3&#10;Team 4" oninput="tekenChecklist()"></textarea>
       <div class="rij">
-        ${heeftPoule?`<div><label>Aantal poules</label><input id="tp_${d.id}" type="number" min="1" value="1"></div>`:''}
-        ${heeftKO?`<div><label>Gaan door per poule</label><input id="tk_${d.id}" type="number" min="1" value="2"></div>`:''}
+        <div><label>Aantal teams</label><input id="ta_${d.id}" type="number" min="2" value="8" oninput="pouleHint('${d.id}')"></div>
+        ${heeftPoule?`<div><label>Teams per poule</label><input id="tp_${d.id}" type="number" min="2" value="4" oninput="pouleHint('${d.id}')"></div>`:''}
+        ${heeftKO?`<div><label>Teams naar knock-out</label><input id="tk_${d.id}" type="number" min="2" step="2" value="8"></div>`:''}
       </div>
+      <div id="hint_${d.id}" class="melding ok" style="margin:8px 0"></div>
+      <label>Teamnamen (optioneel — één per regel; leeg = Team 1, Team 2, …)</label>
+      <textarea id="td_${d.id}" rows="5" placeholder="Jan & Piet&#10;Kees & Bram" oninput="pouleHint('${d.id}')"></textarea>
     </div>`).join('');
+  leesDivisies().forEach(d=>pouleHint(d.id));
+}
+
+// Effectieve teams: ingevoerde namen, anders "Team 1..N" op basis van het aantal
+function effTeams(dId){
+  const ta = el('td_'+dId);
+  const namen = ta ? ta.value.split('\n').map(s=>s.trim()).filter(Boolean) : [];
+  if(namen.length) return namen;
+  const n = Math.max(0, +(el('ta_'+dId)?.value)||0);
+  return Array.from({length:n},(_,i)=>'Team '+(i+1));
+}
+
+function pouleHint(dId){
+  const teams = effTeams(dId);
+  const grootteEl = el('tp_'+dId);
+  let tekst = `${teams.length} teams`;
+  if(grootteEl){
+    const grootte = Math.max(2, +grootteEl.value||4);
+    const poules = Math.max(1, Math.ceil(teams.length/grootte));
+    const namen = Array.from({length:poules},(_,i)=>String.fromCharCode(65+i)).join(', ');
+    tekst += ` ÷ ${grootte} per poule = ${poules} poule${poules>1?'s':''} (${namen})`;
+  }
+  const el2 = el('hint_'+dId); if(el2) el2.textContent = tekst;
+  tekenChecklist();
 }
 
 /* ---- Opbouw tournooi-object ---- */
@@ -245,7 +271,7 @@ let teamTeller=0;
 function bouwToernooi(){
   const divisies=[], teams=[];
   for(const d of leesDivisies()){
-    const namen = (el('td_'+d.id).value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const namen = effTeams(d.id);
     const ids = namen.map(n=>{ const id='tm'+(++teamTeller); teams.push({id,naam:n,divisie:d.id}); return id; });
     const fases=[];
     const heeftPoule = vorm()!=='ko';
@@ -253,26 +279,18 @@ function bouwToernooi(){
 
     let poules=[];
     if(heeftPoule){
-      const aantal = Math.max(1, +(el('tp_'+d.id)?.value)||1);
+      const grootte = Math.max(2, +(el('tp_'+d.id)?.value)||4);
+      const aantal = Math.max(1, Math.ceil(ids.length/grootte));
       poules = Array.from({length:aantal},(_,i)=>({id:d.id+'_p'+letters(i), naam:'Poule '+letters(i), teams:[]}));
       ids.forEach((t,i)=> poules[i%aantal].teams.push(t));
       fases.push({id:d.id+'_poule', type:'poule', poules});
     }
     if(heeftKO){
-      let doorstroom=[], grootte;
-      if(heeftPoule){
-        const doorPer = Math.max(1, +(el('tk_'+d.id)?.value)||1);
-        const quals=[];
-        for(let pos=1; pos<=doorPer; pos++) for(const p of poules) quals.push(p.id+'#'+pos);
-        grootte=1; while(grootte<quals.length) grootte*=2;
-        const order=seedVolgorde(grootte), slotVoorSeed={}; order.forEach((seed,idx)=>slotVoorSeed[seed]=idx);
-        quals.forEach((q,k)=>{ const seed=k+1; if(seed<=grootte) doorstroom.push({van:q, slot:slotVoorSeed[seed]}); });
-      } else {
-        grootte=1; while(grootte<ids.length) grootte*=2;
-        const order=seedVolgorde(grootte), slotVoorSeed={}; order.forEach((seed,idx)=>slotVoorSeed[seed]=idx);
-        ids.forEach((t,k)=>{ const seed=k+1; if(seed<=grootte) doorstroom.push({van:'direct:'+t, slot:slotVoorSeed[seed]}); });
-      }
-      fases.push({id:d.id+'_ko', type:'bracket', grootte, doorstroom});
+      // Knock-out-grootte kiezen; de beste geplaatsten over alle poules stromen door
+      // (alle #1, dan #2, dan de beste #3's) — dat rekent de server uit bij fase-start.
+      let grootte = Math.max(2, +(el('tk_'+d.id)?.value)||8);
+      if(!heeftPoule){ grootte=1; while(grootte<ids.length) grootte*=2; } // alleen-KO: iedereen erin
+      fases.push({id:d.id+'_ko', type:'bracket', grootte, kwalificatie:'beste', doorstroom:[]});
     }
     divisies.push({id:d.id, naam:d.naam, fases});
   }

@@ -27,7 +27,7 @@
   <div id="app" class="verborgen">
     <div class="tabs">
       <button data-tab="scores" class="actief">Scores</button>
-      <button data-tab="aanmelden">Aanmelden</button>
+      <button data-tab="aanmelden">Check-in</button>
       <button data-tab="rondes">Rondes</button>
     </div>
 
@@ -46,7 +46,12 @@
 
     <div id="tab-aanmelden" class="verborgen">
       <div class="kaart">
-        <h3>Nieuw team aanmelden</h3>
+        <h3>Check-in — aanwezige teams</h3>
+        <p class="mini" style="color:#5b6b82">Vink de teams af die aanwezig zijn. Een uitgevinkt team telt als <em>afwezig</em> en doet niet mee.</p>
+        <div id="checkinlijst"></div>
+      </div>
+      <div class="kaart">
+        <h3>Nieuw team toevoegen</h3>
         <label>Teamnaam</label><input id="a_naam" placeholder="bv. Jan & Piet">
         <label>Spelers (komma-gescheiden)</label><input id="a_spelers" placeholder="Jan, Piet">
         <div class="rij">
@@ -54,7 +59,7 @@
           <div><label>Poule (optioneel)</label><select id="a_poule"></select></div>
         </div>
         <div id="aanmeldmelding"></div>
-        <button class="btn" onclick="aanmelden()">Aanmelden</button>
+        <button class="btn" onclick="aanmelden()">Toevoegen</button>
       </div>
     </div>
 
@@ -72,6 +77,7 @@ const slug = new URLSearchParams(location.search).get('slug')
 let DATA = null;
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function divNaam(id){ const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; }
 function toon(id,on){ document.getElementById(id).classList.toggle('verborgen',!on); }
 function melding(el,tekst,ok){ el.innerHTML = tekst?`<div class="melding ${ok?'ok':'fout'}">${esc(tekst)}</div>`:''; }
 
@@ -87,7 +93,7 @@ async function laadData(){
   DATA = await r.json();
   document.getElementById('titel').textContent = DATA.naam;
   toon('login',false); toon('app',true);
-  vulDivisies(); tekenScores(); tekenRondes();
+  vulDivisies(); tekenScores(); tekenRondes(); tekenCheckin();
 }
 
 async function login(){
@@ -98,22 +104,55 @@ async function login(){
   if(r.ok){ melding(el,'',true); laadData(); } else { melding(el,j.fout||'Mislukt',false); }
 }
 
-/* --- Scores --- */
+/* --- Scores (gegroepeerd per niveau, met speeltijd) --- */
 function tekenScores(){
   const filter = document.getElementById('filter').value;
   let ws = DATA.wedstrijden.slice();
   if(filter==='open') ws = ws.filter(w=>w.status!=='klaar');
-  ws.sort((a,b)=>String(a.tijd||'').localeCompare(String(b.tijd||'')));
-  document.getElementById('scorelijst').innerHTML = '<div class="kaart">'+ (ws.length?ws.map(w=>`
+  ws.sort((a,b)=>String(a.tijd||'~').localeCompare(String(b.tijd||'~')));
+  const rij = w => `
     <div class="wed">
-      <div><div class="meta">${esc(w.baan||'baan n.t.b.')} ${w.tijd?'· '+esc(w.tijd):''} · ${esc(w.groep)}</div>
+      <div><div class="meta">${w.tijd?'⏱ '+esc(w.tijd)+' · ':''}${esc(w.baan||'baan n.t.b.')} · ${esc(w.groep==='bracket'?'knock-out':w.groep)}</div>
         <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center">
         <input style="width:52px" type="number" min="0" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}">
         <input style="width:52px" type="number" min="0" id="s_u_${w.id}" value="${w.score?w.score.uit:''}">
         <button class="btn" style="margin:0;padding:8px 10px" onclick="bewaarScore('${w.id}')">✓</button>
       </div>
-    </div>`).join('') : 'Geen wedstrijden.') + '</div>';
+    </div>`;
+  let html='';
+  for(const d of DATA.divisies){
+    const dw = ws.filter(w=>w.divisie===d.id);
+    if(dw.length) html += `<div class="kaart"><h3>${esc(d.naam)}</h3>${dw.map(rij).join('')}</div>`;
+  }
+  const rest = ws.filter(w=>!DATA.divisies.some(d=>d.id===w.divisie));
+  if(rest.length) html += `<div class="kaart"><h3>Overig</h3>${rest.map(rij).join('')}</div>`;
+  document.getElementById('scorelijst').innerHTML = html || '<div class="kaart">Geen wedstrijden.</div>';
+}
+
+/* --- Check-in: aanwezigheid van ingeladen teams --- */
+function tekenCheckin(){
+  const lijst = document.getElementById('checkinlijst');
+  let html='';
+  for(const d of DATA.divisies){
+    const teams = (DATA.teams||[]).filter(t=>t.divisie===d.id);
+    if(!teams.length) continue;
+    const aanwezig = teams.filter(t=>!t.afwezig).length;
+    html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">${esc(d.naam)} <span class="mini">(${aanwezig}/${teams.length} aanwezig)</span></div>`
+      + teams.map(t=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eee;text-transform:none;color:var(--navy)">
+          <input type="checkbox" style="width:auto" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
+  }
+  const rest = (DATA.teams||[]).filter(t=>!DATA.divisies.some(d=>d.id===t.divisie));
+  if(rest.length) html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">Overig</div>`
+    + rest.map(t=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eee;text-transform:none;color:var(--navy)">
+        <input type="checkbox" style="width:auto" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
+  lijst.innerHTML = html || '<p class="mini">Nog geen teams ingeladen. Voeg ze hieronder toe of maak ze aan in de wizard.</p>';
+}
+async function toggleAanwezig(teamId, aanwezig){
+  await fetch('/api/aanwezig',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:DATA.id, teamId, aanwezig})});
+  const t=(DATA.teams||[]).find(x=>x.id===teamId); if(t) t.afwezig=!aanwezig;
+  tekenCheckin();
 }
 
 async function bewaarScore(wid){
