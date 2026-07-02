@@ -11,7 +11,7 @@
   table.board th, table.board td { border:1px solid #33456a; padding:0; }
   table.board th { background:var(--navy-2); color:#fff; padding:8px 10px; font-size:.75rem; position:sticky; top:0; }
   table.board td.tijd { background:var(--navy-2); color:var(--lime); font-family:'Anton'; padding:6px 10px; font-size:.85rem; white-space:nowrap; position:sticky; left:0; }
-  .cel { min-width:150px; height:52px; vertical-align:top; }
+  .cel { min-width:108px; height:50px; vertical-align:top; }
   .cel.over { background:#1a3a1f; }
   .chip { background:var(--wit); color:var(--navy); border-radius:6px; padding:4px 6px; margin:2px; font-size:.72rem; cursor:grab; border-left:4px solid var(--lime); }
   .chip small { display:block; color:#5b6b82; font-size:.62rem; text-transform:uppercase; }
@@ -97,10 +97,12 @@ function teamsOpTijd(tijd, negeerId){
 
 function chip(w){
   const bezet = teamsOpTijd(w.tijd, w.id);
-  const conflict = w.tijd && (bezet.has(w.thuis)||bezet.has(w.uit));
+  const conflict = w.tijd && ((w.thuis&&bezet.has(w.thuis))||(w.uit&&bezet.has(w.uit)));
+  const ko = w.groep==='ko';
+  const label = ko ? (w.label||'knock-out') : (divNaam(w.divisie)+' · '+w.groep);
   return `<div class="chip ${conflict?'conflict':''}" draggable="true" data-id="${w.id}"
      ondragstart="event.dataTransfer.setData('text',this.dataset.id)">
-     <small>${esc(divNaam(w.divisie))} · ${esc(w.groep==='bracket'?'knock-out':w.groep)}</small>
+     <small>${esc(label)}</small>
      ${esc(naam(w.thuis))} — ${esc(naam(w.uit))}</div>`;
 }
 

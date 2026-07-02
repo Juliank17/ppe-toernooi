@@ -13,14 +13,18 @@
   .board td.tijd{ background:var(--navy-2); color:var(--lime); font-family:'Anton'; font-size:.75rem; text-align:center; width:52px; }
   .cel{ height:46px; vertical-align:top; }
   .cel.over{ background:#1a3a1f; }
-  .chip{ background:#fff; color:var(--navy); border-radius:5px; padding:3px 5px; margin:2px; font-size:.66rem; cursor:grab; border-left:3px solid var(--lime); line-height:1.15; }
+  .cel.dicht{ background:#0a1424; }
+  .cel.blok{ background:#3a2f10; color:#e8c96b; font-size:.66rem; text-align:center; }
+  .chip{ background:#fff; color:var(--navy); border-radius:5px; padding:3px 5px; margin:2px; font-size:.66rem; cursor:grab; border-left:4px solid var(--lime); line-height:1.15; }
   .chip small{ display:block; color:#5b6b82; font-size:.58rem; text-transform:uppercase; }
-  .chip.ko{ border-left-color:#8a63d2; }
-  .chip.conflict{ border-left-color:var(--rood); background:#ffe9ea; }
-  .strip{ display:flex; flex-wrap:wrap; gap:2px; max-height:150px; overflow:auto; }
+  .chip.conflict{ outline:2px solid var(--rood); }
+  .strip{ display:flex; flex-wrap:wrap; gap:2px; max-height:160px; overflow:auto; }
   .teamrij{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
   .teamrij input[type=text]{ flex:1; }
   .weg{ background:var(--rood); color:#fff; border:0; border-radius:6px; padding:7px 10px; cursor:pointer; }
+  .aanwezig{ background:#eafbe7; }
+  .legenda{ display:flex; gap:12px; flex-wrap:wrap; font-size:.72rem; color:#5b6b82; margin-top:8px; }
+  .legenda span b{ display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; }
 </style>
 </head>
 <body>
@@ -39,7 +43,7 @@
   <div id="app" class="verborgen">
     <div class="tabs">
       <button data-tab="overzicht" class="actief">Overzicht</button>
-      <button data-tab="teams">Teams</button>
+      <button data-tab="teams">Teams &amp; check-in</button>
       <button data-tab="schema">Schema</button>
       <button data-tab="standen">Standen</button>
       <button data-tab="delen">Delen</button>
@@ -69,14 +73,21 @@
 
       <div class="kaart">
         <h3>Banen</h3>
+        <p class="mini" style="color:#5b6b82">Stel per baan een start- én eindtijd in. Na de eindtijd worden er geen wedstrijden meer ingepland.</p>
         <div id="banen"></div>
         <button class="btn sec" onclick="voegBaan()">+ Baan</button>
         <button class="btn" onclick="bewaarBanen()">Banen opslaan</button>
       </div>
 
       <div class="kaart">
+        <h3>Knock-out per niveau</h3>
+        <div id="koinstel"></div>
+        <p class="mini" style="color:#5b6b82">Zo werkt de plaatsing: de beste geplaatsten over álle poules stromen door (eerst alle nrs 1, dan alle nrs 2, dan de beste nrs 3, enz.). In de bracket speelt de <strong>beste tegen de zwakste</strong> (nr. 1 tegen de laagst geplaatste), en de topgeplaatsten staan in verschillende helften zodat ze elkaar pas laat treffen. Wijzig je de grootte? Genereer daarna opnieuw.</p>
+      </div>
+
+      <div class="kaart">
         <h3>Wedstrijden genereren</h3>
-        <p class="mini" style="color:#5b6b82">Maakt de poulewedstrijden én een leeg knock-out-skelet aan (per niveau). Doe dit als teams en poules kloppen.</p>
+        <p class="mini" style="color:#5b6b82">Maakt de poulewedstrijden én een leeg knock-out-skelet aan (per niveau). Doe dit als teams, poules en knock-out-grootte kloppen.</p>
         <div id="genereerlijst"></div>
       </div>
     </div>
@@ -93,11 +104,20 @@
       <div class="kaart">
         <div class="rij">
           <button class="btn" style="flex:0" onclick="autoVul()">Automatisch invullen</button>
+          <button class="btn sec" style="flex:0" onclick="leegSchema()">Schema leegmaken</button>
           <button class="btn" style="flex:0" onclick="bewaarSchema()">Schema opslaan</button>
           <span id="s_melding"></span>
         </div>
-        <p class="mini" style="color:#5b6b82">Sleep uit "Niet gepland" naar een vak. Paars = knock-out. Rood randje = team speelt op dat tijdstip al ergens anders.</p>
+        <div class="rij" style="margin-top:8px;align-items:end">
+          <div><label>Pauze/blokkade — baan</label>
+            <select id="bl_baan"></select></div>
+          <div><label>Tijd</label><select id="bl_tijd"></select></div>
+          <div><label>Omschrijving</label><input id="bl_label" placeholder="Pauze / lunch"></div>
+          <button class="btn sec" style="flex:0" onclick="voegBlokkade()">+ Blokkade</button>
+        </div>
+        <p class="mini" style="color:#5b6b82">Sleep uit "Niet gepland" naar een vak. Kleur = niveau, paars = knock-out. Rood kader = team speelt op dat tijdstip al ergens anders. Donkere vakken = baan gesloten; oranje = pauze/blokkade.</p>
         <div class="strip" id="unplanned"></div>
+        <div class="legenda" id="legenda"></div>
       </div>
       <div class="kaart" style="overflow-x:auto"><div id="board"></div></div>
     </div>
@@ -117,6 +137,7 @@ const getKey = () => localStorage.getItem('ppe_key') || '';
 const hdr = () => ({'Content-Type':'application/json','x-internal-key':getKey()});
 const id = new URLSearchParams(location.search).get('id');
 let T = null;
+const PALET = ['#C5E506','#4fc3f7','#ff9f43','#ee5253','#26de81','#fd79a8','#a29bfe','#feca57'];
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function el(x){ return document.getElementById(x); }
@@ -124,11 +145,12 @@ function toon(x,on){ el(x).classList.toggle('verborgen',!on); }
 function mgd(x,t,ok){ el(x).innerHTML = t?`<span class="melding ${ok?'ok':'fout'}" style="padding:4px 8px">${esc(t)}</span>`:''; }
 const naam = tid => { const t=(T.teams||[]).find(x=>x.id===tid); return t?t.naam:null; };
 const divNaam = did => { const d=(T.divisies||[]).find(x=>x.id===did); return d?d.naam:''; };
+const divKleur = did => { const i=(T.divisies||[]).findIndex(d=>d.id===did); return PALET[(i<0?0:i)%PALET.length]; };
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
   ['overzicht','teams','schema','standen','delen'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
-  if(b.dataset.tab==='schema') tekenBoard();
+  if(b.dataset.tab==='schema'){ vulBlokVelden(); tekenBoard(); }
   if(b.dataset.tab==='standen') laadStanden();
   if(b.dataset.tab==='delen') tekenDelen();
 });
@@ -138,13 +160,14 @@ async function laad(){
   const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
   if(!r.ok){ el('titel').textContent='Niet gevonden of geen toegang'; return; }
   T = await r.json();
+  T.blokkades = T.blokkades || [];
   el('titel').textContent = T.naam;
   el('subtitel').textContent = [T.datum, T.locatie].filter(Boolean).join(' · ');
   toon('app',true);
-  vulGegevens(); tekenBanen(); tekenGenereer(); tekenTeams();
+  vulGegevens(); tekenBanen(); tekenKnockout(); tekenGenereer(); tekenTeams();
 }
 
-/* ---- Overzicht ---- */
+/* ---- Overzicht: gegevens ---- */
 function vulGegevens(){
   el('g_naam').value=T.naam||''; el('g_datum').value=T.datum||''; el('g_locatie').value=T.locatie||'';
   el('g_pin').value=T.personeelspin||''; el('g_status').value=T.status||'concept';
@@ -156,6 +179,8 @@ async function bewaarGegevens(){
   T.wedstrijdduur=+el('g_duur').value||20; T.wisseltijd=+el('g_wissel').value||5;
   await opslaan('g_melding'); el('titel').textContent=T.naam;
 }
+
+/* ---- Overzicht: banen (start + eind) ---- */
 function tekenBanen(){
   el('banen').innerHTML = (T.banen||[]).map((b,i)=>`
     <div class="teamrij" data-i="${i}">
@@ -163,12 +188,31 @@ function tekenBanen(){
       <select onchange="T.banen[${i}].type=this.value" style="flex:1">
         <option value="indoor" ${b.type==='indoor'?'selected':''}>indoor</option>
         <option value="outdoor" ${b.type==='outdoor'?'selected':''}>outdoor</option></select>
-      <input type="time" value="${b.starttijd||'10:00'}" onchange="T.banen[${i}].starttijd=this.value" style="flex:1">
+      <input type="time" value="${b.starttijd||'10:00'}" onchange="T.banen[${i}].starttijd=this.value" style="flex:1" title="starttijd">
+      <input type="time" value="${b.eindtijd||''}" onchange="T.banen[${i}].eindtijd=this.value" style="flex:1" title="eindtijd">
       <button class="weg" onclick="T.banen.splice(${i},1);tekenBanen()">×</button>
     </div>`).join('') || '<p class="mini">Nog geen banen.</p>';
 }
-function voegBaan(){ T.banen=T.banen||[]; T.banen.push({id:'b'+Date.now(),naam:'Baan '+(T.banen.length+1),type:'indoor',starttijd:'10:00'}); tekenBanen(); }
+function voegBaan(){ T.banen=T.banen||[]; T.banen.push({id:'b'+Date.now(),naam:'Baan '+(T.banen.length+1),type:'indoor',starttijd:'10:00',eindtijd:''}); tekenBanen(); }
 async function bewaarBanen(){ await opslaan(); alert('Banen opgeslagen'); }
+
+/* ---- Overzicht: knock-out-instelling ---- */
+function tekenKnockout(){
+  const rijen=[];
+  for(const d of (T.divisies||[])){
+    const bf=(d.fases||[]).find(f=>f.type==='bracket');
+    if(!bf) continue;
+    rijen.push(`<div class="teamrij"><span style="flex:1">${esc(d.naam)}</span>
+      <label class="mini" style="text-transform:none">Teams in knock-out
+        <input type="number" min="2" step="2" value="${bf.grootte||8}" style="width:80px"
+          onchange="zetKoGrootte('${d.id}',this.value)"></label></div>`);
+  }
+  el('koinstel').innerHTML = rijen.join('') || '<p class="mini">Geen knock-out in dit toernooi.</p>';
+}
+function zetKoGrootte(divId,val){
+  const d=T.divisies.find(x=>x.id===divId); const bf=d&&d.fases.find(f=>f.type==='bracket');
+  if(bf){ let g=Math.max(2,+val||8); let p=1; while(p<g)p*=2; bf.grootte=p; }
+}
 
 function tekenGenereer(){
   el('genereerlijst').innerHTML = (T.divisies||[]).map(d=>`
@@ -177,22 +221,23 @@ function tekenGenereer(){
     || '<p class="mini">Geen niveaus.</p>';
 }
 async function genereer(divisieId){
-  await opslaan(); // eerst huidige teams/poules bewaren
+  await opslaan();
   const r = await fetch('/api/genereer',{method:'POST',headers:hdr(),body:JSON.stringify({id:T.id,divisieId})});
   const j = await r.json();
   if(r.ok){ alert(j.aantal+' wedstrijden gegenereerd.'); await herlaad(); } else alert(j.fout||'Mislukt');
 }
 
-/* ---- Teams (hernoemen/toevoegen/verwijderen) ---- */
+/* ---- Teams & check-in (aanwezig aanvinken) ---- */
 function tekenTeams(){
   let html='';
   for(const d of (T.divisies||[])){
     const teams=(T.teams||[]).filter(x=>x.divisie===d.id);
-    html += `<div class="kaart"><h3>${esc(d.naam)} <span class="mini">(${teams.length} teams)</span></h3>`;
+    const aanwezig=teams.filter(x=>!x.afwezig).length;
+    html += `<div class="kaart"><h3>${esc(d.naam)} <span class="mini">— ${aanwezig}/${teams.length} aanwezig</span></h3>`;
     html += teams.map(tm=>`
-      <div class="teamrij">
+      <div class="teamrij ${tm.afwezig?'':'aanwezig'}" style="padding:4px 6px;border-radius:6px">
+        <label class="mini" style="text-transform:none;flex:0"><input type="checkbox" style="width:auto" ${tm.afwezig?'':'checked'} onchange="zetAanwezig('${tm.id}',this.checked)"> aanwezig</label>
         <input type="text" value="${esc(tm.naam)}" oninput="hernoem('${tm.id}',this.value)">
-        <label class="mini" style="text-transform:none"><input type="checkbox" style="width:auto" ${tm.afwezig?'checked':''} onchange="zetAfwezig('${tm.id}',this.checked)"> afwezig</label>
         <button class="weg" onclick="verwijderTeam('${tm.id}')">×</button>
       </div>`).join('');
     html += `<button class="btn sec" onclick="voegTeam('${d.id}')">+ Team toevoegen</button></div>`;
@@ -200,8 +245,9 @@ function tekenTeams(){
   el('teamslijst').innerHTML = html || '<div class="kaart">Geen niveaus.</div>';
 }
 function hernoem(tid,val){ const t=T.teams.find(x=>x.id===tid); if(t)t.naam=val; }
-function zetAfwezig(tid,v){ const t=T.teams.find(x=>x.id===tid); if(t)t.afwezig=v; }
+function zetAanwezig(tid,v){ const t=T.teams.find(x=>x.id===tid); if(t){ t.afwezig=!v; } tekenTeams(); }
 function verwijderTeam(tid){
+  if(!confirm('Dit team verwijderen?')) return;
   T.teams=T.teams.filter(x=>x.id!==tid);
   (T.divisies||[]).forEach(d=>(d.fases||[]).forEach(f=>(f.poules||[]).forEach(p=>{ p.teams=(p.teams||[]).filter(x=>x!==tid); })));
   tekenTeams();
@@ -209,7 +255,6 @@ function verwijderTeam(tid){
 function voegTeam(divId){
   const nid='tm'+Date.now();
   T.teams.push({id:nid,naam:'Nieuw team',divisie:divId,afwezig:false});
-  // ook in eerste poule van dit niveau plaatsen (indien aanwezig)
   const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
   if(pf&&pf.poules&&pf.poules[0]){ pf.poules[0].teams=pf.poules[0].teams||[]; pf.poules[0].teams.push(nid); }
   tekenTeams();
@@ -219,31 +264,40 @@ async function bewaarTeams(){ await opslaan('t_melding'); tekenTeams(); }
 /* ---- Schema / planbord ---- */
 const toMin=t=>{const[h,m]=String(t||'10:00').split(':').map(Number);return h*60+(m||0);};
 const toHHMM=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function step(){ return (T.wedstrijdduur||20)+(T.wisseltijd||5); }
 function slots(){
   const banen=T.banen||[]; if(!banen.length) return [];
-  const step=(T.wedstrijdduur||20)+(T.wisseltijd||5);
   const start=Math.min(...banen.map(b=>toMin(b.starttijd)));
-  const n=Math.max(8,Math.ceil((T.wedstrijden||[]).length/banen.length)+3);
-  return Array.from({length:n},(_,i)=>toHHMM(start+i*step));
+  const eind=banen.map(b=>b.eindtijd?toMin(b.eindtijd):null).filter(x=>x!=null);
+  let end = eind.length ? Math.max(...eind) : start + Math.max(8,Math.ceil((T.wedstrijden||[]).length/banen.length)+3)*step();
+  const out=[]; for(let m=start;m<end && out.length<48;m+=step()) out.push(toHHMM(m));
+  return out;
 }
+function baanOpen(b,tijd){ const m=toMin(tijd); return m>=toMin(b.starttijd) && (!b.eindtijd || m<toMin(b.eindtijd)); }
+function blok(baanId,tijd){ return (T.blokkades||[]).find(x=>x.baan===baanId && x.tijd===tijd); }
 function teamsOpTijd(tijd,neg){ const s=new Set(); for(const w of T.wedstrijden){ if(w.tijd===tijd&&w.id!==neg){ if(w.thuis)s.add(w.thuis); if(w.uit)s.add(w.uit);} } return s; }
+
 function chip(w){
   const ko=w.groep==='ko';
   const bez=teamsOpTijd(w.tijd,w.id);
   const conflict=w.tijd&&((w.thuis&&bez.has(w.thuis))||(w.uit&&bez.has(w.uit)));
+  const kleur = ko ? '#a29bfe' : divKleur(w.divisie);
   const label = ko ? (w.label||'knock-out') : (divNaam(w.divisie)+' · '+w.groep);
-  const teams = ko ? `${naam(w.thuis)||'?'} — ${naam(w.uit)||'?'}` : `${esc(naam(w.thuis))} — ${esc(naam(w.uit))}`;
-  return `<div class="chip ${ko?'ko':''} ${conflict?'conflict':''}" draggable="true" data-id="${w.id}"
+  const teams = `${naam(w.thuis)||'n.t.b.'} — ${naam(w.uit)||'n.t.b.'}`;
+  return `<div class="chip ${conflict?'conflict':''}" style="border-left-color:${kleur}" draggable="true" data-id="${w.id}"
      ondragstart="event.dataTransfer.setData('text',this.dataset.id)">
      <small>${esc(label)}</small>${esc(teams)}</div>`;
 }
 function tekenBoard(){
   if(!T) return;
   const banen=T.banen||[]; const tijden=slots();
-  let h='<table class="board"><colgroup><col style="width:48px">'+banen.map(()=>'<col>').join('')+'</colgroup><tr><th>Tijd</th>'+banen.map(b=>`<th>${esc(b.naam)}</th>`).join('')+'</tr>';
+  let h='<table class="board"><colgroup><col style="width:48px">'+banen.map(()=>'<col>').join('')+'</colgroup><tr><th>Tijd</th>'+banen.map(b=>`<th>${esc(b.naam)}<br><small class="mini">${b.starttijd||''}${b.eindtijd?'–'+b.eindtijd:''}</small></th>`).join('')+'</tr>';
   for(const tijd of tijden){
     h+=`<tr><td class="tijd">${tijd}</td>`;
     for(const b of banen){
+      const bl=blok(b.id,tijd);
+      if(bl){ h+=`<td class="cel blok" title="klik om te verwijderen" onclick="verwijderBlokkade('${b.id}','${tijd}')">${esc(bl.label||'pauze')}</td>`; continue; }
+      if(!baanOpen(b,tijd)){ h+='<td class="cel dicht"></td>'; continue; }
       const hier=T.wedstrijden.filter(w=>w.baan===b.id&&w.tijd===tijd);
       h+=`<td class="cel" data-baan="${b.id}" data-tijd="${tijd}"
         ondragover="event.preventDefault();this.classList.add('over')"
@@ -253,11 +307,15 @@ function tekenBoard(){
   }
   h+='</table>';
   el('board').innerHTML=h;
+
   const open=T.wedstrijden.filter(w=>!w.baan||!w.tijd);
   const up=el('unplanned');
   up.innerHTML=open.map(chip).join('')||'<p class="mini">Alles ingepland 🎉</p>';
   up.ondragover=e=>e.preventDefault();
   up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w){w.baan=null;w.tijd=null;tekenBoard();} };
+
+  el('legenda').innerHTML = (T.divisies||[]).map(d=>`<span><b style="background:${divKleur(d.id)}"></b>${esc(d.naam)}</span>`).join('')
+    + `<span><b style="background:#a29bfe"></b>Knock-out</span>`;
 }
 function drop(e,cel){
   e.preventDefault(); cel.classList.remove('over');
@@ -273,18 +331,44 @@ function autoVul(){
     for(const tijd of tijden){ if(done)break;
       const teams=teamsOpTijd(tijd,w.id);
       if((w.thuis&&teams.has(w.thuis))||(w.uit&&teams.has(w.uit))) continue;
-      for(const b of banen){ if(!T.wedstrijden.some(x=>x.baan===b.id&&x.tijd===tijd)){ w.baan=b.id;w.tijd=tijd;done=true;break; } }
+      for(const b of banen){
+        if(!baanOpen(b,tijd) || blok(b.id,tijd)) continue;
+        if(!T.wedstrijden.some(x=>x.baan===b.id&&x.tijd===tijd)){ w.baan=b.id;w.tijd=tijd;done=true;break; }
+      }
     }
   }
   tekenBoard(); mgd('s_melding','Ingevuld — controleer en sla op.',true);
 }
-async function bewaarSchema(){
-  const planning=T.wedstrijden.map(w=>({wedstrijdId:w.id,baan:w.baan,tijd:w.tijd}));
-  const r=await fetch('/api/plan',{method:'POST',headers:hdr(),body:JSON.stringify({id:T.id,planning})});
-  mgd('s_melding', r.ok?'Schema opgeslagen.':'Mislukt', r.ok);
+function leegSchema(){
+  if(!confirm('Weet je zeker dat je het hele schema wilt leegmaken? Alle wedstrijden gaan terug naar "Niet gepland".')) return;
+  T.wedstrijden.forEach(w=>{ w.baan=null; w.tijd=null; });
+  tekenBoard(); mgd('s_melding','Schema leeggemaakt — vergeet niet op te slaan.',true);
+}
+async function bewaarSchema(){ await opslaan('s_melding'); }
+
+/* ---- Blokkades / pauzes ---- */
+function vulBlokVelden(){
+  el('bl_baan').innerHTML = '<option value="__alle">Alle banen</option>' + (T.banen||[]).map(b=>`<option value="${b.id}">${esc(b.naam)}</option>`).join('');
+  el('bl_tijd').innerHTML = slots().map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+function voegBlokkade(){
+  const baan=el('bl_baan').value, tijd=el('bl_tijd').value, label=el('bl_label').value||'Pauze';
+  if(!tijd) return;
+  const doelen = baan==='__alle' ? (T.banen||[]).map(b=>b.id) : [baan];
+  T.blokkades = T.blokkades||[];
+  doelen.forEach(bid=>{
+    if(!T.blokkades.some(x=>x.baan===bid && x.tijd===tijd)) T.blokkades.push({baan:bid,tijd,label});
+    // zet een eventueel geplande wedstrijd op dat vak terug
+    T.wedstrijden.filter(w=>w.baan===bid&&w.tijd===tijd).forEach(w=>{w.baan=null;w.tijd=null;});
+  });
+  el('bl_label').value=''; tekenBoard();
+}
+function verwijderBlokkade(baanId,tijd){
+  T.blokkades = (T.blokkades||[]).filter(x=>!(x.baan===baanId && x.tijd===tijd));
+  tekenBoard();
 }
 
-/* ---- Standen (via live-data) ---- */
+/* ---- Standen ---- */
 async function laadStanden(){
   const r=await fetch('/api/live?slug='+encodeURIComponent(T.slug));
   if(!r.ok){ el('standen').innerHTML='<div class="kaart">Kon standen niet laden.</div>'; return; }
@@ -318,7 +402,7 @@ async function opslaan(meldEl){
 }
 async function herlaad(){
   const r=await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
-  if(r.ok){ T=await r.json(); tekenBoard(); tekenTeams(); tekenGenereer(); }
+  if(r.ok){ T=await r.json(); T.blokkades=T.blokkades||[]; tekenBoard(); tekenTeams(); tekenGenereer(); tekenKnockout(); }
 }
 
 laad();
