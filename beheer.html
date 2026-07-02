@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Toernooi — Beheer</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .terug { color:var(--lime); font-size:.8rem; text-decoration:none; }
+  .board { border-collapse:collapse; width:100%; table-layout:fixed; }
+  .board th,.board td{ border:1px solid #33456a; padding:0; }
+  .board th{ background:var(--navy-2); color:#fff; padding:6px 4px; font-size:.68rem; }
+  .board td.tijd{ background:var(--navy-2); color:var(--lime); font-family:'Anton'; font-size:.75rem; text-align:center; width:52px; }
+  .cel{ height:46px; vertical-align:top; }
+  .cel.over{ background:#1a3a1f; }
+  .chip{ background:#fff; color:var(--navy); border-radius:5px; padding:3px 5px; margin:2px; font-size:.66rem; cursor:grab; border-left:3px solid var(--lime); line-height:1.15; }
+  .chip small{ display:block; color:#5b6b82; font-size:.58rem; text-transform:uppercase; }
+  .chip.ko{ border-left-color:#8a63d2; }
+  .chip.conflict{ border-left-color:var(--rood); background:#ffe9ea; }
+  .strip{ display:flex; flex-wrap:wrap; gap:2px; max-height:150px; overflow:auto; }
+  .teamrij{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .teamrij input[type=text]{ flex:1; }
+  .weg{ background:var(--rood); color:#fff; border:0; border-radius:6px; padding:7px 10px; cursor:pointer; }
+</style>
+</head>
+<body>
+<header class="kop">
+  <a class="terug" href="/admin.html">← Alle toernooien</a>
+  <div class="logo" style="margin-top:6px">PRIME PADEL EVENTS</div>
+  <h1 id="titel">Toernooi</h1>
+  <div class="sub" id="subtitel"></div>
+</header>
+
+<div class="wrap" style="max-width:1400px">
+  <div id="geenkey" class="kaart verborgen">
+    <p>Interne sleutel nodig. Vul 'm in op <a href="/admin.html">Beheer</a> en kom terug.</p>
+  </div>
+
+  <div id="app" class="verborgen">
+    <div class="tabs">
+      <button data-tab="overzicht" class="actief">Overzicht</button>
+      <button data-tab="teams">Teams</button>
+      <button data-tab="schema">Schema</button>
+      <button data-tab="standen">Standen</button>
+      <button data-tab="delen">Delen</button>
+    </div>
+
+    <!-- OVERZICHT -->
+    <div id="tab-overzicht">
+      <div class="kaart">
+        <h2>Gegevens</h2>
+        <div class="rij">
+          <div><label>Naam</label><input id="g_naam"></div>
+          <div><label>Datum</label><input id="g_datum" type="date"></div>
+        </div>
+        <div class="rij">
+          <div><label>Locatie</label><input id="g_locatie"></div>
+          <div><label>Personeel-PIN</label><input id="g_pin"></div>
+          <div><label>Status</label>
+            <select id="g_status"><option>concept</option><option>live</option><option>afgerond</option></select></div>
+        </div>
+        <div class="rij">
+          <div><label>Wedstrijdduur (min)</label><input id="g_duur" type="number"></div>
+          <div><label>Wisseltijd (min)</label><input id="g_wissel" type="number"></div>
+        </div>
+        <button class="btn" onclick="bewaarGegevens()">Gegevens opslaan</button>
+        <span id="g_melding"></span>
+      </div>
+
+      <div class="kaart">
+        <h3>Banen</h3>
+        <div id="banen"></div>
+        <button class="btn sec" onclick="voegBaan()">+ Baan</button>
+        <button class="btn" onclick="bewaarBanen()">Banen opslaan</button>
+      </div>
+
+      <div class="kaart">
+        <h3>Wedstrijden genereren</h3>
+        <p class="mini" style="color:#5b6b82">Maakt de poulewedstrijden én een leeg knock-out-skelet aan (per niveau). Doe dit als teams en poules kloppen.</p>
+        <div id="genereerlijst"></div>
+      </div>
+    </div>
+
+    <!-- TEAMS -->
+    <div id="tab-teams" class="verborgen">
+      <div id="teamslijst"></div>
+      <button class="btn" onclick="bewaarTeams()">Teams opslaan</button>
+      <span id="t_melding"></span>
+    </div>
+
+    <!-- SCHEMA -->
+    <div id="tab-schema" class="verborgen">
+      <div class="kaart">
+        <div class="rij">
+          <button class="btn" style="flex:0" onclick="autoVul()">Automatisch invullen</button>
+          <button class="btn" style="flex:0" onclick="bewaarSchema()">Schema opslaan</button>
+          <span id="s_melding"></span>
+        </div>
+        <p class="mini" style="color:#5b6b82">Sleep uit "Niet gepland" naar een vak. Paars = knock-out. Rood randje = team speelt op dat tijdstip al ergens anders.</p>
+        <div class="strip" id="unplanned"></div>
+      </div>
+      <div class="kaart" style="overflow-x:auto"><div id="board"></div></div>
+    </div>
+
+    <!-- STANDEN -->
+    <div id="tab-standen" class="verborgen"><div id="standen"></div></div>
+
+    <!-- DELEN -->
+    <div id="tab-delen" class="verborgen"><div id="delen"></div></div>
+  </div>
+</div>
+
+<footer class="vt">Beheer per toernooi · Prime Padel Events</footer>
+
+<script>
+const getKey = () => localStorage.getItem('ppe_key') || '';
+const hdr = () => ({'Content-Type':'application/json','x-internal-key':getKey()});
+const id = new URLSearchParams(location.search).get('id');
+let T = null;
+
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function el(x){ return document.getElementById(x); }
+function toon(x,on){ el(x).classList.toggle('verborgen',!on); }
+function mgd(x,t,ok){ el(x).innerHTML = t?`<span class="melding ${ok?'ok':'fout'}" style="padding:4px 8px">${esc(t)}</span>`:''; }
+const naam = tid => { const t=(T.teams||[]).find(x=>x.id===tid); return t?t.naam:null; };
+const divNaam = did => { const d=(T.divisies||[]).find(x=>x.id===did); return d?d.naam:''; };
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
+  ['overzicht','teams','schema','standen','delen'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
+  if(b.dataset.tab==='schema') tekenBoard();
+  if(b.dataset.tab==='standen') laadStanden();
+  if(b.dataset.tab==='delen') tekenDelen();
+});
+
+async function laad(){
+  if(!getKey()){ toon('geenkey',true); return; }
+  const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
+  if(!r.ok){ el('titel').textContent='Niet gevonden of geen toegang'; return; }
+  T = await r.json();
+  el('titel').textContent = T.naam;
+  el('subtitel').textContent = [T.datum, T.locatie].filter(Boolean).join(' · ');
+  toon('app',true);
+  vulGegevens(); tekenBanen(); tekenGenereer(); tekenTeams();
+}
+
+/* ---- Overzicht ---- */
+function vulGegevens(){
+  el('g_naam').value=T.naam||''; el('g_datum').value=T.datum||''; el('g_locatie').value=T.locatie||'';
+  el('g_pin').value=T.personeelspin||''; el('g_status').value=T.status||'concept';
+  el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=T.wisseltijd||5;
+}
+async function bewaarGegevens(){
+  T.naam=el('g_naam').value; T.datum=el('g_datum').value; T.locatie=el('g_locatie').value;
+  T.personeelspin=el('g_pin').value; T.status=el('g_status').value;
+  T.wedstrijdduur=+el('g_duur').value||20; T.wisseltijd=+el('g_wissel').value||5;
+  await opslaan('g_melding'); el('titel').textContent=T.naam;
+}
+function tekenBanen(){
+  el('banen').innerHTML = (T.banen||[]).map((b,i)=>`
+    <div class="teamrij" data-i="${i}">
+      <input type="text" value="${esc(b.naam)}" oninput="T.banen[${i}].naam=this.value" style="flex:2">
+      <select onchange="T.banen[${i}].type=this.value" style="flex:1">
+        <option value="indoor" ${b.type==='indoor'?'selected':''}>indoor</option>
+        <option value="outdoor" ${b.type==='outdoor'?'selected':''}>outdoor</option></select>
+      <input type="time" value="${b.starttijd||'10:00'}" onchange="T.banen[${i}].starttijd=this.value" style="flex:1">
+      <button class="weg" onclick="T.banen.splice(${i},1);tekenBanen()">×</button>
+    </div>`).join('') || '<p class="mini">Nog geen banen.</p>';
+}
+function voegBaan(){ T.banen=T.banen||[]; T.banen.push({id:'b'+Date.now(),naam:'Baan '+(T.banen.length+1),type:'indoor',starttijd:'10:00'}); tekenBanen(); }
+async function bewaarBanen(){ await opslaan(); alert('Banen opgeslagen'); }
+
+function tekenGenereer(){
+  el('genereerlijst').innerHTML = (T.divisies||[]).map(d=>`
+    <div class="teamrij"><span style="flex:1">${esc(d.naam)}</span>
+      <button class="btn sec" style="margin:0" onclick="genereer('${d.id}')">Genereer</button></div>`).join('')
+    || '<p class="mini">Geen niveaus.</p>';
+}
+async function genereer(divisieId){
+  await opslaan(); // eerst huidige teams/poules bewaren
+  const r = await fetch('/api/genereer',{method:'POST',headers:hdr(),body:JSON.stringify({id:T.id,divisieId})});
+  const j = await r.json();
+  if(r.ok){ alert(j.aantal+' wedstrijden gegenereerd.'); await herlaad(); } else alert(j.fout||'Mislukt');
+}
+
+/* ---- Teams (hernoemen/toevoegen/verwijderen) ---- */
+function tekenTeams(){
+  let html='';
+  for(const d of (T.divisies||[])){
+    const teams=(T.teams||[]).filter(x=>x.divisie===d.id);
+    html += `<div class="kaart"><h3>${esc(d.naam)} <span class="mini">(${teams.length} teams)</span></h3>`;
+    html += teams.map(tm=>`
+      <div class="teamrij">
+        <input type="text" value="${esc(tm.naam)}" oninput="hernoem('${tm.id}',this.value)">
+        <label class="mini" style="text-transform:none"><input type="checkbox" style="width:auto" ${tm.afwezig?'checked':''} onchange="zetAfwezig('${tm.id}',this.checked)"> afwezig</label>
+        <button class="weg" onclick="verwijderTeam('${tm.id}')">×</button>
+      </div>`).join('');
+    html += `<button class="btn sec" onclick="voegTeam('${d.id}')">+ Team toevoegen</button></div>`;
+  }
+  el('teamslijst').innerHTML = html || '<div class="kaart">Geen niveaus.</div>';
+}
+function hernoem(tid,val){ const t=T.teams.find(x=>x.id===tid); if(t)t.naam=val; }
+function zetAfwezig(tid,v){ const t=T.teams.find(x=>x.id===tid); if(t)t.afwezig=v; }
+function verwijderTeam(tid){
+  T.teams=T.teams.filter(x=>x.id!==tid);
+  (T.divisies||[]).forEach(d=>(d.fases||[]).forEach(f=>(f.poules||[]).forEach(p=>{ p.teams=(p.teams||[]).filter(x=>x!==tid); })));
+  tekenTeams();
+}
+function voegTeam(divId){
+  const nid='tm'+Date.now();
+  T.teams.push({id:nid,naam:'Nieuw team',divisie:divId,afwezig:false});
+  // ook in eerste poule van dit niveau plaatsen (indien aanwezig)
+  const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
+  if(pf&&pf.poules&&pf.poules[0]){ pf.poules[0].teams=pf.poules[0].teams||[]; pf.poules[0].teams.push(nid); }
+  tekenTeams();
+}
+async function bewaarTeams(){ await opslaan('t_melding'); tekenTeams(); }
+
+/* ---- Schema / planbord ---- */
+const toMin=t=>{const[h,m]=String(t||'10:00').split(':').map(Number);return h*60+(m||0);};
+const toHHMM=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function slots(){
+  const banen=T.banen||[]; if(!banen.length) return [];
+  const step=(T.wedstrijdduur||20)+(T.wisseltijd||5);
+  const start=Math.min(...banen.map(b=>toMin(b.starttijd)));
+  const n=Math.max(8,Math.ceil((T.wedstrijden||[]).length/banen.length)+3);
+  return Array.from({length:n},(_,i)=>toHHMM(start+i*step));
+}
+function teamsOpTijd(tijd,neg){ const s=new Set(); for(const w of T.wedstrijden){ if(w.tijd===tijd&&w.id!==neg){ if(w.thuis)s.add(w.thuis); if(w.uit)s.add(w.uit);} } return s; }
+function chip(w){
+  const ko=w.groep==='ko';
+  const bez=teamsOpTijd(w.tijd,w.id);
+  const conflict=w.tijd&&((w.thuis&&bez.has(w.thuis))||(w.uit&&bez.has(w.uit)));
+  const label = ko ? (w.label||'knock-out') : (divNaam(w.divisie)+' · '+w.groep);
+  const teams = ko ? `${naam(w.thuis)||'?'} — ${naam(w.uit)||'?'}` : `${esc(naam(w.thuis))} — ${esc(naam(w.uit))}`;
+  return `<div class="chip ${ko?'ko':''} ${conflict?'conflict':''}" draggable="true" data-id="${w.id}"
+     ondragstart="event.dataTransfer.setData('text',this.dataset.id)">
+     <small>${esc(label)}</small>${esc(teams)}</div>`;
+}
+function tekenBoard(){
+  if(!T) return;
+  const banen=T.banen||[]; const tijden=slots();
+  let h='<table class="board"><colgroup><col style="width:48px">'+banen.map(()=>'<col>').join('')+'</colgroup><tr><th>Tijd</th>'+banen.map(b=>`<th>${esc(b.naam)}</th>`).join('')+'</tr>';
+  for(const tijd of tijden){
+    h+=`<tr><td class="tijd">${tijd}</td>`;
+    for(const b of banen){
+      const hier=T.wedstrijden.filter(w=>w.baan===b.id&&w.tijd===tijd);
+      h+=`<td class="cel" data-baan="${b.id}" data-tijd="${tijd}"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')" ondrop="drop(event,this)">${hier.map(chip).join('')}</td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</table>';
+  el('board').innerHTML=h;
+  const open=T.wedstrijden.filter(w=>!w.baan||!w.tijd);
+  const up=el('unplanned');
+  up.innerHTML=open.map(chip).join('')||'<p class="mini">Alles ingepland 🎉</p>';
+  up.ondragover=e=>e.preventDefault();
+  up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w){w.baan=null;w.tijd=null;tekenBoard();} };
+}
+function drop(e,cel){
+  e.preventDefault(); cel.classList.remove('over');
+  const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(!w) return;
+  const bez=T.wedstrijden.find(x=>x.baan===cel.dataset.baan&&x.tijd===cel.dataset.tijd&&x.id!==w.id);
+  if(bez){bez.baan=null;bez.tijd=null;}
+  w.baan=cel.dataset.baan; w.tijd=cel.dataset.tijd; tekenBoard();
+}
+function autoVul(){
+  const banen=T.banen||[], tijden=slots();
+  for(const w of T.wedstrijden.filter(w=>!w.baan||!w.tijd)){
+    let done=false;
+    for(const tijd of tijden){ if(done)break;
+      const teams=teamsOpTijd(tijd,w.id);
+      if((w.thuis&&teams.has(w.thuis))||(w.uit&&teams.has(w.uit))) continue;
+      for(const b of banen){ if(!T.wedstrijden.some(x=>x.baan===b.id&&x.tijd===tijd)){ w.baan=b.id;w.tijd=tijd;done=true;break; } }
+    }
+  }
+  tekenBoard(); mgd('s_melding','Ingevuld — controleer en sla op.',true);
+}
+async function bewaarSchema(){
+  const planning=T.wedstrijden.map(w=>({wedstrijdId:w.id,baan:w.baan,tijd:w.tijd}));
+  const r=await fetch('/api/plan',{method:'POST',headers:hdr(),body:JSON.stringify({id:T.id,planning})});
+  mgd('s_melding', r.ok?'Schema opgeslagen.':'Mislukt', r.ok);
+}
+
+/* ---- Standen (via live-data) ---- */
+async function laadStanden(){
+  const r=await fetch('/api/live?slug='+encodeURIComponent(T.slug));
+  if(!r.ok){ el('standen').innerHTML='<div class="kaart">Kon standen niet laden.</div>'; return; }
+  const d=await r.json();
+  el('standen').innerHTML=(d.divisies||[]).map(div=>`
+    <div class="kaart donker"><h2>${esc(div.naam)}</h2></div>
+    ${div.poules.map(p=>`<div class="kaart"><h3>${esc(p.naam)}</h3><table>
+      <tr><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th>+/-</th><th>P</th></tr>
+      ${p.stand.map(r=>`<tr><td>${r.positie}</td><td>${esc(r.teamNaam)}</td><td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td><td>${r.saldo>0?'+':''}${r.saldo}</td><td class="p">${r.P}</td></tr>`).join('')}
+      </table></div>`).join('')}`).join('')||'<div class="kaart">Nog geen standen. Genereer eerst wedstrijden.</div>';
+}
+
+/* ---- Delen ---- */
+function tekenDelen(){
+  const base=location.origin;
+  el('delen').innerHTML=`<div class="kaart">
+    <h3>Links</h3>
+    <p><strong>Spelers (live):</strong><br><a href="${base}/live/${esc(T.slug)}">${base}/live/${esc(T.slug)}</a></p>
+    <p><strong>Personeel:</strong><br><a href="${base}/staff/${esc(T.slug)}">${base}/staff/${esc(T.slug)}</a></p>
+    <p><strong>Personeel-PIN:</strong> ${esc(T.personeelspin||'(nog niet ingesteld)')}</p>
+    <p class="mini" style="color:#5b6b82">Deel de spelers-link vrij; de personeel-link + PIN alleen met je medewerkers.</p>
+  </div>`;
+}
+
+/* ---- Opslaan (hele toernooi) ---- */
+async function opslaan(meldEl){
+  const r=await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(T)});
+  const j=await r.json();
+  if(meldEl) mgd(meldEl, r.ok?'Opgeslagen.':(j.fout||'Mislukt'), r.ok);
+  return r.ok;
+}
+async function herlaad(){
+  const r=await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
+  if(r.ok){ T=await r.json(); tekenBoard(); tekenTeams(); tekenGenereer(); }
+}
+
+laad();
+</script>
+</body>
+</html>

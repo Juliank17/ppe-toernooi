@@ -112,7 +112,7 @@ function tekenScores(){
   ws.sort((a,b)=>String(a.tijd||'~').localeCompare(String(b.tijd||'~')));
   const rij = w => `
     <div class="wed">
-      <div><div class="meta">${w.tijd?'⏱ '+esc(w.tijd)+' · ':''}${esc(w.baan||'baan n.t.b.')} · ${esc(w.groep==='bracket'?'knock-out':w.groep)}</div>
+      <div><div class="meta">${w.tijd?'⏱ '+esc(w.tijd)+' · ':''}${esc(w.baan||'baan n.t.b.')} · ${esc(w.label || (w.groep==='bracket'?'knock-out':w.groep))}</div>
         <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center">
         <input style="width:52px" type="number" min="0" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}">

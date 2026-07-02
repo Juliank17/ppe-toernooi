@@ -58,7 +58,7 @@ function standTabel(p){
 function bracketBlok(d){
   if(!d.bracket || !d.bracket.length) return '';
   const rows = d.bracket.map(w => `
-    <div class="wed"><div><div class="meta">Ronde ${w.ronde}</div>
+    <div class="wed"><div><div class="meta">${esc(w.label||('Ronde '+w.ronde))}</div>
       <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       <div class="score">${w.score ? w.score.thuis+'-'+w.score.uit : ''}</div></div>`).join('');
   return `<div class="kaart"><h3>Knock-out</h3>${rows}</div>`;
@@ -80,7 +80,7 @@ function render(data){
   const divNaam = id => { const d=(data.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
   document.getElementById('tab-schema').innerHTML = (data.schema||[]).length
     ? `<div class="kaart">${data.schema.map(w => `
-        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.groep&&w.groep!=='bracket'?' · '+esc(w.groep):''}</div>
+        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.label?' · '+esc(w.label):(w.groep&&w.groep!=='ko'&&w.groep!=='bracket'?' · '+esc(w.groep):'')}</div>
           <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
           <div class="score">${w.score ? w.score.thuis+'-'+w.score.uit : '<span class="badge">nog te spelen</span>'}</div>
         </div>`).join('')}</div>`

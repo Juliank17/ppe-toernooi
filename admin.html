@@ -86,9 +86,11 @@ async function laadOverzicht(){
     if(r.status===401){ document.getElementById('overzicht').innerHTML='<span style="color:#c00">Sleutel ontbreekt of onjuist.</span>'; return; }
     const j = await r.json();
     document.getElementById('overzicht').innerHTML = (j.toernooien||[]).map(t=>`
-      <div class="wed"><div><div class="teams">${esc(t.naam)}</div>
-        <div class="meta">${esc(t.datum)} · ${esc(t.status)} · id ${esc(t.id)}</div></div>
-        <div><a href="/live.html?slug=${encodeURIComponent(t.slug)}">live</a> ·
+      <div class="wed"><div>
+        <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" style="text-decoration:none">${esc(t.naam)} →</a></div>
+        <div class="meta">${esc(t.datum)} · ${esc(t.status)}</div></div>
+        <div><a href="/beheer.html?id=${encodeURIComponent(t.id)}">beheren</a> ·
+             <a href="/live.html?slug=${encodeURIComponent(t.slug)}">live</a> ·
              <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">personeel</a></div></div>`).join('') || 'Nog geen toernooien.';
   }catch(e){ document.getElementById('overzicht').textContent='Fout bij laden.'; }
 }
