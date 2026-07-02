@@ -1,0 +1,92 @@
+/* PPE Toernooisysteem — huisstijl: navy #0A1D38 + lime #C5E506, Anton + Archivo */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700&display=swap');
+
+:root {
+  --navy: #0A1D38;
+  --navy-2: #12294a;
+  --lime: #C5E506;
+  --wit: #ffffff;
+  --grijs: #e9edf3;
+  --grijs-2: #aeb8c7;
+  --rood: #e5484d;
+  --groen: #46a758;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Archivo', system-ui, sans-serif;
+  background: var(--navy);
+  color: var(--wit);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: 'Anton', sans-serif; font-weight: 400; letter-spacing: .5px; margin: 0 0 .4em; }
+h1 { font-size: 2rem; }
+a { color: var(--lime); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+header.kop {
+  text-align: center;
+  padding: 28px 16px 20px;
+  background: linear-gradient(180deg, var(--navy-2), var(--navy));
+  border-bottom: 3px solid var(--lime);
+}
+header.kop .logo { font-family: 'Anton'; font-size: 1.1rem; color: var(--lime); letter-spacing: 1px; }
+header.kop h1 { margin-top: 6px; }
+header.kop .sub { color: var(--grijs-2); }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; background: var(--lime); padding: 8px; border-radius: 12px; margin: 16px 0; flex-wrap: wrap; }
+.tabs button {
+  flex: 1; min-width: 110px; border: 0; cursor: pointer;
+  font-family: 'Archivo'; font-weight: 700; text-transform: uppercase; font-size: .8rem;
+  padding: 10px; border-radius: 8px; background: transparent; color: var(--navy);
+}
+.tabs button.actief { background: var(--navy); color: var(--wit); }
+
+/* Kaarten */
+.kaart { background: var(--wit); color: var(--navy); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.kaart h2, .kaart h3 { color: var(--navy); }
+.kaart.donker { background: var(--navy-2); color: var(--wit); }
+.kaart.donker h2, .kaart.donker h3 { color: var(--wit); }
+
+/* Tabellen */
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--grijs); }
+th { font-size: .7rem; text-transform: uppercase; color: var(--grijs-2); }
+td.p { background: var(--lime); color: var(--navy); font-weight: 700; text-align: center; border-radius: 4px; }
+tr.tie td { outline: 1px dashed var(--rood); outline-offset: -3px; }
+
+/* Wedstrijd-kaart */
+.wed { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--grijs); }
+.wed .meta { font-size: .72rem; color: var(--grijs-2); text-transform: uppercase; }
+.wed .teams { font-weight: 600; }
+.wed .score { font-family: 'Anton'; font-size: 1.1rem; }
+.badge { display: inline-block; background: var(--lime); color: var(--navy); border-radius: 5px; padding: 1px 7px; font-weight: 700; font-size: .8rem; }
+
+/* Formulieren & knoppen */
+label { display: block; font-size: .75rem; text-transform: uppercase; color: var(--grijs-2); margin: 10px 0 4px; }
+.kaart label { color: #5b6b82; }
+input, select, textarea {
+  width: 100%; padding: 10px; border: 1px solid var(--grijs); border-radius: 8px;
+  font-family: 'Archivo'; font-size: 1rem; background: var(--wit); color: var(--navy);
+}
+.btn {
+  display: inline-block; cursor: pointer; border: 0; border-radius: 8px;
+  background: var(--lime); color: var(--navy); font-family: 'Archivo'; font-weight: 700;
+  text-transform: uppercase; font-size: .85rem; padding: 11px 16px; margin-top: 12px;
+}
+.btn.sec { background: var(--navy); color: var(--wit); }
+.btn:disabled { opacity: .5; cursor: default; }
+.rij { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.rij > * { flex: 1; }
+
+.melding { padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: .9rem; }
+.melding.ok { background: rgba(70,167,88,.18); color: #bff0c7; }
+.melding.fout { background: rgba(229,72,77,.18); color: #ffc9cb; }
+.verborgen { display: none !important; }
+.mini { font-size: .78rem; color: var(--grijs-2); }
+footer.vt { text-align: center; padding: 24px; color: var(--grijs-2); font-size: .8rem; }
