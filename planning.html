@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE Toernooi — Planbord</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .plangrid { overflow:auto; }
+  table.board { border-collapse:collapse; min-width:100%; }
+  table.board th, table.board td { border:1px solid #33456a; padding:0; }
+  table.board th { background:var(--navy-2); color:#fff; padding:8px 10px; font-size:.75rem; position:sticky; top:0; }
+  table.board td.tijd { background:var(--navy-2); color:var(--lime); font-family:'Anton'; padding:6px 10px; font-size:.85rem; white-space:nowrap; position:sticky; left:0; }
+  .cel { min-width:150px; height:52px; vertical-align:top; }
+  .cel.over { background:#1a3a1f; }
+  .chip { background:var(--wit); color:var(--navy); border-radius:6px; padding:4px 6px; margin:2px; font-size:.72rem; cursor:grab; border-left:4px solid var(--lime); }
+  .chip small { display:block; color:#5b6b82; font-size:.62rem; text-transform:uppercase; }
+  .chip.conflict { border-left-color:var(--rood); background:#ffe9ea; }
+  .paneel { max-height:70vh; overflow:auto; }
+  .kop2 { font-family:'Anton'; font-size:.8rem; color:var(--lime); margin:10px 0 4px; text-transform:uppercase; }
+  .legenda { font-size:.72rem; color:var(--grijs-2); }
+  @media (max-width:760px){ .layout{ grid-template-columns:1fr !important; } }
+</style>
+</head>
+<body>
+<header class="kop">
+  <div class="logo">PRIME PADEL EVENTS · PLANBORD</div>
+  <h1 id="titel">Schema bouwen</h1>
+  <div class="sub">Sleep wedstrijden op de banen &amp; tijden — hoe compacter, hoe minder baankosten</div>
+</header>
+
+<div class="wrap">
+  <div class="kaart">
+    <div class="rij">
+      <div><label>Toernooi</label><select id="kies"></select></div>
+      <button class="btn sec" style="flex:0" onclick="laad()">Openen</button>
+      <button class="btn" style="flex:0" onclick="autoVul()">Automatisch invullen</button>
+      <button class="btn" style="flex:0" onclick="bewaar()">Opslaan</button>
+    </div>
+    <div id="melding"></div>
+    <div class="legenda">Tip: sleep een wedstrijd van rechts naar een vak. Een <span style="color:var(--rood)">rood randje</span> = team speelt op dat tijdstip al ergens anders.</div>
+  </div>
+
+  <div class="layout" style="display:grid;grid-template-columns:1fr 300px;gap:14px">
+    <div class="kaart plangrid"><div id="board">Kies een toernooi…</div></div>
+    <div class="kaart donker paneel">
+      <h3>Niet gepland</h3>
+      <div id="unplanned"></div>
+    </div>
+  </div>
+</div>
+
+<footer class="vt">Wijzigingen worden pas bewaard als je op “Opslaan” klikt.</footer>
+
+<script>
+const getKey = () => localStorage.getItem('ppe_key') || '';
+const hdr = () => ({'Content-Type':'application/json','x-internal-key':getKey()});
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function melding(t,ok){ document.getElementById('melding').innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${esc(t)}</div>`:''; }
+const toMin = t => { const [h,m]=String(t||'10:00').split(':').map(Number); return h*60+(m||0); };
+const toHHMM = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+let DATA=null;
+const naam = id => { const t=(DATA.teams||[]).find(x=>x.id===id); return t?t.naam:(id||'n.t.b.'); };
+const divNaam = id => { const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
+
+async function vulKeuze(){
+  const r = await fetch('/api/toernooi',{headers:hdr()});
+  if(r.status===401){ melding('Interne sleutel ontbreekt — stel die in via Beheer.',false); return; }
+  const j = await r.json();
+  document.getElementById('kies').innerHTML = (j.toernooien||[]).map(t=>`<option value="${t.id}">${esc(t.naam)}</option>`).join('');
+}
+
+async function laad(){
+  const id = document.getElementById('kies').value;
+  const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
+  if(!r.ok){ melding('Kon toernooi niet laden',false); return; }
+  DATA = await r.json();
+  document.getElementById('titel').textContent = DATA.naam;
+  teken();
+}
+
+function slots(){
+  const banen = DATA.banen||[];
+  if(!banen.length) return [];
+  const step = (DATA.wedstrijdduur||20)+(DATA.wisseltijd||5);
+  const start = Math.min(...banen.map(b=>toMin(b.starttijd)));
+  const n = Math.max(8, Math.ceil((DATA.wedstrijden||[]).length/banen.length)+3);
+  return Array.from({length:n},(_,i)=>toHHMM(start+i*step));
+}
+
+function teamsOpTijd(tijd, negeerId){
+  const set = new Set();
+  for(const w of DATA.wedstrijden){ if(w.tijd===tijd && w.id!==negeerId){ set.add(w.thuis); set.add(w.uit); } }
+  return set;
+}
+
+function chip(w){
+  const bezet = teamsOpTijd(w.tijd, w.id);
+  const conflict = w.tijd && (bezet.has(w.thuis)||bezet.has(w.uit));
+  return `<div class="chip ${conflict?'conflict':''}" draggable="true" data-id="${w.id}"
+     ondragstart="event.dataTransfer.setData('text',this.dataset.id)">
+     <small>${esc(divNaam(w.divisie))} · ${esc(w.groep==='bracket'?'knock-out':w.groep)}</small>
+     ${esc(naam(w.thuis))} — ${esc(naam(w.uit))}</div>`;
+}
+
+function teken(){
+  const banen = DATA.banen||[];
+  const tijden = slots();
+  let html = '<table class="board"><tr><th>Tijd</th>'+banen.map(b=>`<th>${esc(b.naam)}<br><small>${esc(b.type||'')}</small></th>`).join('')+'</tr>';
+  for(const tijd of tijden){
+    html += `<tr><td class="tijd">${tijd}</td>`;
+    for(const b of banen){
+      const hier = DATA.wedstrijden.filter(w=>w.baan===b.id && w.tijd===tijd);
+      html += `<td class="cel" data-baan="${b.id}" data-tijd="${tijd}"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="drop(event,this)">${hier.map(chip).join('')}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  document.getElementById('board').innerHTML = html;
+
+  const open = DATA.wedstrijden.filter(w=>!w.baan||!w.tijd);
+  let up='';
+  for(const d of (DATA.divisies||[])){
+    const rij = open.filter(w=>w.divisie===d.id);
+    if(!rij.length) continue;
+    up += `<div class="kop2">${esc(d.naam)} (${rij.length})</div>`+rij.map(chip).join('');
+  }
+  const zonder = open.filter(w=>!(DATA.divisies||[]).some(d=>d.id===w.divisie));
+  if(zonder.length) up += `<div class="kop2">Overig</div>`+zonder.map(chip).join('');
+  const upEl = document.getElementById('unplanned');
+  upEl.innerHTML = up || '<p class="mini">Alles is ingepland 🎉</p>';
+  upEl.ondragover = e => e.preventDefault();
+  upEl.ondrop = dropUnplanned;
+}
+
+function drop(e, cel){
+  e.preventDefault(); cel.classList.remove('over');
+  const id = e.dataTransfer.getData('text');
+  const w = DATA.wedstrijden.find(x=>x.id===id); if(!w) return;
+  const bezet = DATA.wedstrijden.find(x=>x.baan===cel.dataset.baan && x.tijd===cel.dataset.tijd && x.id!==id);
+  if(bezet){ bezet.baan=null; bezet.tijd=null; }
+  w.baan = cel.dataset.baan; w.tijd = cel.dataset.tijd;
+  teken();
+}
+function dropUnplanned(e){
+  e.preventDefault();
+  const id = e.dataTransfer.getData('text');
+  const w = DATA.wedstrijden.find(x=>x.id===id); if(!w) return;
+  w.baan=null; w.tijd=null; teken();
+}
+
+function autoVul(){
+  if(!DATA) return;
+  const banen = DATA.banen||[]; const tijden = slots();
+  const open = DATA.wedstrijden.filter(w=>!w.baan||!w.tijd);
+  for(const w of open){
+    let gezet=false;
+    for(const tijd of tijden){
+      if(gezet) break;
+      const teams = teamsOpTijd(tijd, w.id);
+      if(teams.has(w.thuis)||teams.has(w.uit)) continue;
+      for(const b of banen){
+        const bezet = DATA.wedstrijden.some(x=>x.baan===b.id && x.tijd===tijd);
+        if(!bezet){ w.baan=b.id; w.tijd=tijd; gezet=true; break; }
+      }
+    }
+  }
+  teken();
+  melding('Automatisch ingevuld — sleep waar nodig bij en klik Opslaan.',true);
+}
+
+async function bewaar(){
+  if(!DATA) return;
+  const planning = DATA.wedstrijden.map(w=>({wedstrijdId:w.id, baan:w.baan, tijd:w.tijd}));
+  const r = await fetch('/api/plan',{method:'POST',headers:hdr(),body:JSON.stringify({id:DATA.id, planning})});
+  const j = await r.json();
+  melding(r.ok?`Opgeslagen (${j.bijgewerkt} wedstrijden).`:(j.fout||'Mislukt'), r.ok);
+}
+
+vulKeuze();
+</script>
+</body>
+</html>
