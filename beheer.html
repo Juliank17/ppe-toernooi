@@ -179,10 +179,22 @@ function vulGegevens(){
   el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=T.wisseltijd||5;
 }
 async function bewaarGegevens(){
+  const oudeStap = step();
+  const oudeStart = (T.banen&&T.banen.length) ? Math.min(...T.banen.map(b=>toMin(b.starttijd))) : null;
   T.naam=el('g_naam').value; T.datum=el('g_datum').value; T.locatie=el('g_locatie').value;
   T.personeelspin=el('g_pin').value; T.status=el('g_status').value;
-  T.wedstrijdduur=+el('g_duur').value||20; T.wisseltijd=+el('g_wissel').value||5;
-  await opslaan('g_melding'); el('titel').textContent=T.naam;
+  T.wedstrijdduur=+el('g_duur').value||20; T.wisseltijd=Math.max(0,+el('g_wissel').value||0);
+  // Andere duur/wisseltijd? Schuif geplande tijden en blokkades mee naar het nieuwe raster.
+  const nieuweStap = step();
+  let geschaald=false;
+  if(oudeStart!=null && nieuweStap!==oudeStap){
+    const remap=t=>{ const i=Math.round((toMin(t)-oudeStart)/oudeStap); return toHHMM(oudeStart+Math.max(0,i)*nieuweStap); };
+    (T.wedstrijden||[]).forEach(w=>{ if(w.tijd) w.tijd=remap(w.tijd); });
+    (T.blokkades||[]).forEach(b=>{ if(b.tijd) b.tijd=remap(b.tijd); });
+    geschaald=true;
+  }
+  const ok = await opslaan('g_melding'); el('titel').textContent=T.naam;
+  if(ok && geschaald) mgd('g_melding','Opgeslagen — speeltijden zijn meegeschaald naar de nieuwe duur, controleer het planbord.',true);
 }
 
 /* ---- Overzicht: banen (start + eind) ---- */
@@ -473,16 +485,34 @@ function verwijderBlokkade(baanId,tijd){
 }
 
 /* ---- Standen ---- */
+let STANDEN=null, standenNiveau='alle';
 async function laadStanden(){
   const r=await fetch('/api/live?slug='+encodeURIComponent(T.slug));
   if(!r.ok){ el('standen').innerHTML='<div class="kaart">Kon standen niet laden.</div>'; return; }
-  const d=await r.json();
-  el('standen').innerHTML=(d.divisies||[]).map(div=>`
+  STANDEN=await r.json();
+  tekenStanden();
+}
+function tekenStanden(){
+  const alle=STANDEN.divisies||[];
+  const kies=`<div class="kaart"><label>Niveau</label>
+    <select onchange="standenNiveau=this.value;tekenStanden()">
+      <option value="alle" ${standenNiveau==='alle'?'selected':''}>Alle niveaus</option>
+      ${alle.map(d=>`<option value="${d.id}" ${standenNiveau===d.id?'selected':''}>${esc(d.naam)}</option>`).join('')}
+    </select></div>`;
+  const divs=alle.filter(d=>standenNiveau==='alle'||d.id===standenNiveau);
+  el('standen').innerHTML = kies + (divs.map(div=>`
     <div class="kaart donker"><h2>${esc(div.naam)}</h2></div>
     ${div.poules.map(p=>`<div class="kaart"><h3>${esc(p.naam)}</h3><table>
       <tr><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th>+/-</th><th>P</th></tr>
       ${p.stand.map(r=>`<tr><td>${r.positie}</td><td>${esc(r.teamNaam)}</td><td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td><td>${r.saldo>0?'+':''}${r.saldo}</td><td class="p">${r.P}</td></tr>`).join('')}
-      </table></div>`).join('')}`).join('')||'<div class="kaart">Nog geen standen. Genereer eerst wedstrijden.</div>';
+      </table></div>`).join('')}
+    ${(div.bracket&&div.bracket.length)?`<div class="kaart"><h3>Knock-out — ${esc(div.naam)}</h3>
+      ${div.bracket.map(w=>`<div class="wed"><div>
+        <div class="meta">${esc(w.label||('Ronde '+w.ronde))}</div>
+        <div class="teams" ${w.voorlopig?'style="color:#8494ab;font-style:italic"':''}>${esc(w.thuis)} — ${esc(w.uit)}</div></div>
+        <div class="score">${w.score?w.score.thuis+'-'+w.score.uit:''}</div></div>`).join('')}
+      <p class="mini" style="color:#5b6b82">Cursief = nog niet definitief; wordt ingevuld bij het starten van de knock-outfase.</p></div>`:''}`).join('')
+    || '<div class="kaart">Nog geen standen. Genereer eerst wedstrijden.</div>');
 }
 
 /* ---- Delen ---- */
