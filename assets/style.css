@@ -25,6 +25,8 @@ body {
 h1, h2, h3 { font-family: 'Anton', sans-serif; font-weight: 400; letter-spacing: .5px; margin: 0 0 .4em; }
 h1 { font-size: 2rem; }
 a { color: var(--lime); }
+/* Links op witte kaarten: navy met lime onderstreping (lime op wit is onleesbaar) */
+.kaart a { color: var(--navy); text-decoration-color: var(--lime); text-decoration-thickness: 2px; text-underline-offset: 2px; }
 
 .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
 
@@ -48,10 +50,12 @@ header.kop .sub { color: var(--grijs-2); }
 .tabs button.actief { background: var(--navy); color: var(--wit); }
 
 /* Kaarten */
-.kaart { background: var(--wit); color: var(--navy); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.kaart { background: var(--wit); color: var(--navy); border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 3px 14px rgba(0,0,0,.22); }
 .kaart h2, .kaart h3 { color: var(--navy); }
+.kaart h2 { border-left: 4px solid var(--lime); padding-left: 10px; }
 .kaart.donker { background: var(--navy-2); color: var(--wit); }
 .kaart.donker h2, .kaart.donker h3 { color: var(--wit); }
+.kaart.donker a { color: var(--lime); }
 
 /* Tabellen */
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
@@ -61,7 +65,9 @@ td.p { background: var(--lime); color: var(--navy); font-weight: 700; text-align
 tr.tie td { outline: 1px dashed var(--rood); outline-offset: -3px; }
 
 /* Wedstrijd-kaart */
-.wed { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--grijs); }
+.wed { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 12px; border-bottom: 1px solid var(--grijs); border-radius: 8px; }
+.wed:hover { background: #f4f8fd; }
+.wed:last-of-type { border-bottom: 0; }
 .wed .meta { font-size: .72rem; color: var(--grijs-2); text-transform: uppercase; }
 .wed .teams { font-weight: 600; }
 .wed .score { font-family: 'Anton'; font-size: 1.1rem; }
@@ -71,16 +77,37 @@ tr.tie td { outline: 1px dashed var(--rood); outline-offset: -3px; }
 label { display: block; font-size: .75rem; text-transform: uppercase; color: var(--grijs-2); margin: 10px 0 4px; }
 .kaart label { color: #5b6b82; }
 input, select, textarea {
-  width: 100%; padding: 10px; border: 1px solid var(--grijs); border-radius: 8px;
+  width: 100%; padding: 10px; border: 1px solid #ccd5e0; border-radius: 8px;
   font-family: 'Archivo'; font-size: 1rem; background: var(--wit); color: var(--navy);
 }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--lime); outline-offset: 1px; }
+/* Vinkjes en radio's niet oprekken tot volle breedte */
+input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--navy); }
 .btn {
   display: inline-block; cursor: pointer; border: 0; border-radius: 8px;
   background: var(--lime); color: var(--navy); font-family: 'Archivo'; font-weight: 700;
   text-transform: uppercase; font-size: .85rem; padding: 11px 16px; margin-top: 12px;
+  text-decoration: none; text-align: center; letter-spacing: .3px;
+  transition: filter .15s, transform .05s;
 }
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(1px); }
 .btn.sec { background: var(--navy); color: var(--wit); }
+.kaart a.btn.sec { color: var(--wit); }
+.kaart a.btn { text-decoration: none; }
 .btn:disabled { opacity: .5; cursor: default; }
+/* Kleine actie-knopjes (pillen) voor lijstregels */
+.chip {
+  display: inline-block; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--grijs); color: var(--navy); font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .3px; text-decoration: none; white-space: nowrap;
+}
+.chip:hover { background: var(--lime); }
+.kaart a.chip { color: var(--navy); text-decoration: none; }
+.chip.gevaar { background: #fbe4e5; color: #a1191d; }
+.chip.gevaar:hover { background: var(--rood); color: var(--wit); }
+.kaart a.chip.gevaar { color: #a1191d; }
+.kaart a.chip.gevaar:hover { color: var(--wit); }
 .rij { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
 .rij > * { flex: 1; }
 
@@ -90,3 +117,11 @@ input, select, textarea {
 .verborgen { display: none !important; }
 .mini { font-size: .78rem; color: var(--grijs-2); }
 footer.vt { text-align: center; padding: 24px; color: var(--grijs-2); font-size: .8rem; }
+
+/* Mobiel */
+@media (max-width: 640px) {
+  .wrap { padding: 12px; }
+  h1 { font-size: 1.5rem; }
+  .kaart { padding: 14px; border-radius: 12px; }
+  .wed { grid-template-columns: 1fr; }
+}
