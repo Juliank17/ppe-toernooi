@@ -40,10 +40,10 @@
     <div class="tabs">
       <button data-tab="scores" class="actief">Scores</button>
       <button data-tab="aanmelden">Check-in</button>
-      <button data-tab="rondes">Rondes</button>
     </div>
 
     <div id="tab-scores">
+      <div id="voortgang"></div>
       <div class="kaart">
         <div class="rij">
           <div><label>Filter</label>
@@ -75,9 +75,6 @@
       </div>
     </div>
 
-    <div id="tab-rondes" class="verborgen">
-      <div id="rondelijst"></div>
-    </div>
   </div>
 </div>
 
@@ -96,7 +93,7 @@ function melding(el,tekst,ok){ el.innerHTML = tekst?`<div class="melding ${ok?'o
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
-  ['scores','aanmelden','rondes'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
+  ['scores','aanmelden'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
 });
 
 async function laadData(){
@@ -106,7 +103,7 @@ async function laadData(){
   DATA = await r.json();
   document.getElementById('titel').textContent = DATA.naam;
   toon('login',false); toon('app',true);
-  vulDivisies(); tekenScores(); tekenRondes(); tekenCheckin();
+  vulDivisies(); tekenVoortgang(); tekenScores(); tekenCheckin();
 }
 
 async function login(){
@@ -117,15 +114,45 @@ async function login(){
   if(r.ok){ melding(el,'',true); laadData(); } else { melding(el,j.fout||'Mislukt',false); }
 }
 
-/* --- Scores (gegroepeerd per niveau, met speeltijd) --- */
+/* --- Voortgang per niveau (met start/terugdraai-knop knock-out) --- */
+function tekenVoortgang(){
+  const blok = DATA.divisies.map(d=>{
+    const ws = DATA.wedstrijden.filter(w=>w.divisie===d.id);
+    const p = ws.filter(w=>w.groep!=='ko'), k = ws.filter(w=>w.groep==='ko');
+    const pd = p.filter(w=>w.status==='klaar').length, kd = k.filter(w=>w.status==='klaar').length;
+    let knop='';
+    if(d.heeftKnockout){
+      knop = d.knockoutGestart
+        ? `<a class="mini" style="cursor:pointer;color:#a1191d" onclick="fase('${d.id}',true)">knock-out terugdraaien</a>`
+        : `<button class="btn" style="margin:6px 0 0;padding:8px 12px;font-size:.75rem" onclick="fase('${d.id}',false)" ${pd<p.length?'title="Nog niet alle poulewedstrijden zijn ingevuld"':''}>Start knock-out ➜</button>`;
+    }
+    return `<div style="border:1px solid var(--grijs);border-radius:10px;padding:10px 14px;min-width:170px">
+      <div style="font-family:'Anton';margin-bottom:4px">${esc(d.naam)}</div>
+      <div class="mini" style="color:#5b6b82">Groepsfase <b style="color:var(--navy)">${pd}/${p.length}</b>
+        ${d.heeftKnockout?` · Knock-out <b style="color:var(--navy)">${kd}/${k.length}</b>`:''}</div>
+      ${knop}</div>`;
+  }).join('');
+  document.getElementById('voortgang').innerHTML =
+    `<div class="kaart"><h3>Voortgang</h3><div style="display:flex;gap:10px;flex-wrap:wrap">${blok}</div></div>`;
+}
+
+/* --- Scores: gegroepeerd op tijd (per tijdblok alle banen onder elkaar) --- */
+function baanNaam(id){ const b=(DATA.banen||[]).find(x=>x.id===id); return b?b.naam:(id||'Baan n.t.b.'); }
+function pouleNaam(w){
+  for(const d of DATA.divisies){ const p=(d.poules||[]).find(x=>x.id===w.groep); if(p) return p.naam; }
+  return null;
+}
+function wedLabel(w){
+  const p = pouleNaam(w);
+  return (w.groep==='ko' ? (w.label||'Knock-out') : (p||w.groep)) + ' · ' + divNaam(w.divisie);
+}
 function tekenScores(){
   const filter = document.getElementById('filter').value;
   let ws = DATA.wedstrijden.slice();
   if(filter==='open') ws = ws.filter(w=>w.status!=='klaar');
-  ws.sort((a,b)=>String(a.tijd||'~').localeCompare(String(b.tijd||'~')));
   const rij = w => `
     <div class="wed">
-      <div><div class="meta">${w.tijd?'⏱ '+esc(w.tijd)+' · ':''}${esc(w.baan||'baan n.t.b.')} · ${esc(w.label || (w.groep==='bracket'?'knock-out':w.groep))}</div>
+      <div><div class="meta">${esc(baanNaam(w.baan))} · ${esc(wedLabel(w))}</div>
         <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       <div class="scorein">
         <input type="number" min="0" inputmode="numeric" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}" placeholder="${esc(kort(w.thuis))}">
@@ -133,14 +160,15 @@ function tekenScores(){
         <button class="btn" onclick="bewaarScore('${w.id}')">✓</button>
       </div>
     </div>`;
+  const tijden = [...new Set(ws.filter(w=>w.tijd).map(w=>w.tijd))].sort((a,b)=>String(a).localeCompare(String(b)));
   let html='';
-  for(const d of DATA.divisies){
-    const dw = ws.filter(w=>w.divisie===d.id);
-    if(dw.length) html += `<div class="kaart"><h3>${esc(d.naam)}</h3>${dw.map(rij).join('')}</div>`;
+  for(const tijd of tijden){
+    const dw = ws.filter(w=>w.tijd===tijd).sort((a,b)=>baanNaam(a.baan).localeCompare(baanNaam(b.baan),undefined,{numeric:true}));
+    html += `<div class="kaart"><h3>⏱ ${esc(tijd)}</h3>${dw.map(rij).join('')}</div>`;
   }
-  const rest = ws.filter(w=>!DATA.divisies.some(d=>d.id===w.divisie));
-  if(rest.length) html += `<div class="kaart"><h3>Overig</h3>${rest.map(rij).join('')}</div>`;
-  document.getElementById('scorelijst').innerHTML = html || '<div class="kaart">Geen wedstrijden.</div>';
+  const rest = ws.filter(w=>!w.tijd);
+  if(rest.length) html += `<div class="kaart"><h3>Nog niet ingepland</h3>${rest.map(rij).join('')}</div>`;
+  document.getElementById('scorelijst').innerHTML = html || '<div class="kaart">Geen wedstrijden'+(filter==='open'?' meer in te vullen 🎉':'')+'.</div>';
 }
 
 /* --- Check-in: aanwezigheid van ingeladen teams --- */
@@ -204,19 +232,10 @@ async function aanmelden(){
   else melding(el,j.fout||'Mislukt',false);
 }
 
-/* --- Rondes --- */
-function tekenRondes(){
-  const ds = DATA.divisies.filter(d=>d.heeftKnockout);
-  document.getElementById('rondelijst').innerHTML = ds.length? ds.map(d=>`
-    <div class="kaart"><h3>${esc(d.naam)}</h3>
-      <p class="mini">${d.knockoutGestart?'Knock-outfase is gestart.':'Poulefase loopt nog.'}</p>
-      ${d.knockoutGestart
-        ? `<button class="btn sec" onclick="fase('${d.id}',true)">Terugdraaien</button>`
-        : `<button class="btn" onclick="fase('${d.id}',false)">Start knock-outfase</button>`}
-    </div>`).join('') : '<div class="kaart">Geen knock-outfase in dit toernooi.</div>';
-}
+/* --- Knock-outfase starten / terugdraaien --- */
 async function fase(divisieId,terug){
   if(!terug && !confirm('Knock-outfase starten op basis van de huidige eindstanden?')) return;
+  if(terug && !confirm('Knock-out terugdraaien? De knock-out-uitslagen worden gewist, de planning blijft staan.')) return;
   const r = await fetch('/api/fase-start',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:DATA.id,divisieId,terug})});
   if(r.ok) laadData(); else { const j=await r.json(); alert(j.fout||'Mislukt'); }
