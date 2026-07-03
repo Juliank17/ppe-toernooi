@@ -342,19 +342,34 @@ function stapTerug(){
   tekenBoard(); mgd('s_melding','Stap teruggedraaid — vergeet niet op te slaan.',true);
 }
 
-/* ---- Auto-invul opties (aanvinkbaar per niveau/fase) ---- */
-function tekenVulOpties(){
-  const opts=[];
-  for(const d of (T.divisies||[])){
-    if((T.wedstrijden||[]).some(w=>w.divisie===d.id && w.groep!=='ko'))
-      opts.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-div="${d.id}" data-soort="poule" checked>
-        <b style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${divKleur(d.id)}"></b> Poules ${esc(d.naam)}</label>`);
-    if((T.wedstrijden||[]).some(w=>w.divisie===d.id && w.groep==='ko'))
-      opts.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-div="${d.id}" data-soort="ko" checked>
-        <b style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${divKleur(d.id)}"></b> Knock-out ${esc(d.naam)}</label>`);
-  }
-  el('vulopties').innerHTML = opts.join('') || '<span class="mini">Nog geen wedstrijden — genereer eerst (tab Overzicht).</span>';
+/* ---- Auto-invul opties: per niveau, per ronde aanvinkbaar ---- */
+function vulKey(w){ return w.divisie+'|'+(w.groep==='ko'?'ko':'p')+'|'+(w.ronde||1); }
+function koRondeLabel(ws,r){
+  const w=ws.find(x=>x.groep==='ko'&&(x.ronde||1)===r&&x.label);
+  return w ? String(w.label).replace(/\s*\d+$/,'') : 'KO-ronde '+r;
 }
+function tekenVulOpties(){
+  let html='';
+  for(const d of (T.divisies||[])){
+    const ws=(T.wedstrijden||[]).filter(w=>w.divisie===d.id);
+    const blokjes=[];
+    const pouleRondes=[...new Set(ws.filter(w=>w.groep!=='ko').map(w=>w.ronde||1))].sort((a,b)=>a-b);
+    for(const r of pouleRondes)
+      blokjes.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-key="${d.id}|p|${r}" checked> Ronde ${r}</label>`);
+    const koRondes=[...new Set(ws.filter(w=>w.groep==='ko').map(w=>w.ronde||1))].sort((a,b)=>a-b);
+    for(const r of koRondes)
+      blokjes.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-key="${d.id}|ko|${r}" checked> ${esc(koRondeLabel(ws,r))}</label>`);
+    const heeftBracket=(d.fases||[]).some(f=>f.type==='bracket');
+    if(heeftBracket && !koRondes.length)
+      blokjes.push(`<span class="mini" style="color:#c00">knock-out nog niet gegenereerd (tab Overzicht → Genereer)</span>`);
+    if(!blokjes.length) continue;
+    html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-left:4px solid ${divKleur(d.id)};padding:2px 0 2px 10px;margin-bottom:6px">
+      <b style="font-size:.85rem">${esc(d.naam)}</b>${blokjes.join('')}</div>`;
+  }
+  if(html) html+=`<div class="mini"><a onclick="alleVul(true)" style="cursor:pointer">alles aan</a> · <a onclick="alleVul(false)" style="cursor:pointer">alles uit</a></div>`;
+  el('vulopties').innerHTML = html || '<span class="mini">Nog geen wedstrijden — genereer eerst (tab Overzicht).</span>';
+}
+function alleVul(aan){ document.querySelectorAll('.vulopt').forEach(c=>c.checked=aan); }
 function tekenBoard(){
   if(!T) return;
   const banen=T.banen||[]; const tijden=slots();
@@ -393,10 +408,12 @@ function drop(e,cel){
   w.baan=cel.dataset.baan; w.tijd=cel.dataset.tijd; tekenBoard();
 }
 function autoVul(){
-  const kies=new Set([...document.querySelectorAll('.vulopt:checked')].map(c=>c.dataset.div+'|'+c.dataset.soort));
+  const kies=new Set([...document.querySelectorAll('.vulopt:checked')].map(c=>c.dataset.key));
   if(!kies.size){ mgd('s_melding','Vink eerst aan wat je wilt invullen.',false); return; }
-  const doel=T.wedstrijden.filter(w=>(!w.baan||!w.tijd) && kies.has(w.divisie+'|'+(w.groep==='ko'?'ko':'poule')));
+  const doel=T.wedstrijden.filter(w=>(!w.baan||!w.tijd) && kies.has(vulKey(w)));
   if(!doel.length){ mgd('s_melding','Geen open wedstrijden in de aangevinkte selectie.',false); return; }
+  // Nette volgorde: eerst poulerondes (1,2,3...), dan de knock-outrondes
+  doel.sort((a,b)=> ((a.groep==='ko')-(b.groep==='ko')) || ((a.ronde||1)-(b.ronde||1)));
   snap();
   const banen=T.banen||[], tijden=slots();
   let gelukt=0;
