@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PPE Toernooi — Live</title>
 <link rel="stylesheet" href="/assets/style.css">
+<style>
+  tr.ik td{ background:#f4fbd8; font-weight:700; }
+  .teamkaart{ border-left:6px solid var(--lime); }
+</style>
 </head>
 <body>
 <header class="kop">
@@ -14,6 +18,14 @@
 </header>
 
 <div class="wrap">
+  <div class="kaart" style="padding:12px 16px">
+    <div class="rij">
+      <div><label>Niveau</label><select id="f_niveau" onchange="zetFilter()"><option value="alle">Alle niveaus</option></select></div>
+      <div><label>Zoek je team</label><input id="f_team" list="teamlijst" placeholder="Typ je teamnaam…" oninput="zetFilter()"></div>
+    </div>
+    <datalist id="teamlijst"></datalist>
+  </div>
+
   <div class="tabs">
     <button data-tab="standen" class="actief">Standen</button>
     <button data-tab="schema">Schema</button>
@@ -43,9 +55,9 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-function standTabel(p){
+function standTabel(p, zoek){
   const rows = p.stand.map(r => `
-    <tr class="${r.gelijkstand?'tie':''}">
+    <tr class="${r.gelijkstand?'tie':''} ${zoek&&String(r.teamNaam).toLowerCase().includes(zoek)?'ik':''}">
       <td>${r.positie}</td><td>${esc(r.teamNaam)}</td>
       <td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td>
       <td class="uitgebreid">${r.DPV}</td><td class="uitgebreid">${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
@@ -64,27 +76,72 @@ function bracketBlok(d){
   return `<div class="kaart"><h3>Knock-out</h3>${rows}</div>`;
 }
 
-function render(data){
-  document.getElementById('titel').textContent = data.naam;
-  document.getElementById('subtitel').textContent = [data.datum, data.locatie].filter(Boolean).join(' · ');
+let DATA=null, fNiv='alle', fTeam='';
+function zetFilter(){
+  fNiv=document.getElementById('f_niveau').value;
+  fTeam=document.getElementById('f_team').value;
+  teken();
+}
+function render(data){ DATA=data; vulFilters(); teken(); }
+
+function vulFilters(){
+  const sel=document.getElementById('f_niveau');
+  sel.innerHTML = '<option value="alle">Alle niveaus</option>' +
+    (DATA.divisies||[]).map(d=>`<option value="${d.id}">${esc(d.naam)}</option>`).join('');
+  sel.value = (DATA.divisies||[]).some(d=>d.id===fNiv) ? fNiv : 'alle';
+  const namen=new Set();
+  (DATA.divisies||[]).forEach(d=>d.poules.forEach(p=>p.stand.forEach(r=>namen.add(r.teamNaam))));
+  document.getElementById('teamlijst').innerHTML=[...namen].sort().map(n=>`<option value="${esc(n)}">`).join('');
+}
+
+// Blok voor het gezochte team: positie in de poule + eigen wedstrijden (uitslagen + programma)
+function teamBlok(zoek){
+  if(!zoek) return '';
+  let gev=null;
+  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
+    if(!gev && String(r.teamNaam).toLowerCase().includes(zoek)) gev={d,p,r};
+  if(!gev) return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>';
+  const {d,p,r}=gev;
+  const nl=String(r.teamNaam).toLowerCase();
+  const mijn=(DATA.schema||[]).filter(w=>String(w.thuis).toLowerCase()===nl||String(w.uit).toLowerCase()===nl);
+  const rows=mijn.map(w=>`
+    <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)}${w.label?' · '+esc(w.label):''}</div>
+      <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
+      <div class="score">${w.score?w.score.thuis+'-'+w.score.uit:'<span class="badge">nog te spelen</span>'}</div></div>`).join('');
+  return `<div class="kaart teamkaart">
+    <h3>${esc(r.teamNaam)}</h3>
+    <p class="mini" style="color:#5b6b82">${esc(d.naam)} · ${esc(p.naam)} · positie <b>${r.positie}</b> van ${p.stand.length} · ${r.P} punten (${r.W} winst, ${r.GL} gelijk, ${r.V} verlies)</p>
+    ${rows||'<p class="mini">Nog geen wedstrijden ingepland.</p>'}
+  </div>`;
+}
+
+function teken(){
+  if(!DATA) return;
+  document.getElementById('titel').textContent = DATA.naam;
+  document.getElementById('subtitel').textContent = [DATA.datum, DATA.locatie].filter(Boolean).join(' · ');
   document.getElementById('infotekst').textContent =
-    `${data.naam} — ${data.locatie||''}. Banen: ${(data.banen||[]).map(b=>b.naam).join(', ')||'n.t.b.'}`;
+    `${DATA.naam} — ${DATA.locatie||''}. Banen: ${(DATA.banen||[]).map(b=>b.naam).join(', ')||'n.t.b.'}`;
 
-  // Standen (per divisie)
-  document.getElementById('tab-standen').innerHTML = (data.divisies||[]).map(d => `
+  const zoek=fTeam.trim().toLowerCase();
+  const divs=(DATA.divisies||[]).filter(d=>fNiv==='alle'||d.id===fNiv);
+
+  // Standen (per divisie, gefilterd; gezocht team uitgelicht)
+  document.getElementById('tab-standen').innerHTML = teamBlok(zoek) + (divs.map(d => `
     <div class="kaart donker"><h2>${esc(d.naam)}</h2></div>
-    ${d.poules.map(standTabel).join('')}
-    ${bracketBlok(d)}`).join('') || '<div class="kaart">Nog geen standen.</div>';
+    ${d.poules.map(p=>standTabel(p,zoek)).join('')}
+    ${bracketBlok(d)}`).join('') || '<div class="kaart">Nog geen standen.</div>');
 
-  // Schema (met niveau + speeltijd)
-  const divNaam = id => { const d=(data.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
-  document.getElementById('tab-schema').innerHTML = (data.schema||[]).length
-    ? `<div class="kaart">${data.schema.map(w => `
-        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.label?' · '+esc(w.label):(w.groep&&w.groep!=='ko'&&w.groep!=='bracket'?' · '+esc(w.groep):'')}</div>
+  // Schema (met niveau + speeltijd, gefilterd)
+  const divNaam = id => { const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
+  let sch=(DATA.schema||[]).filter(w=>fNiv==='alle'||w.divisie===fNiv);
+  if(zoek) sch=sch.filter(w=>String(w.thuis).toLowerCase().includes(zoek)||String(w.uit).toLowerCase().includes(zoek));
+  document.getElementById('tab-schema').innerHTML = sch.length
+    ? `<div class="kaart">${sch.map(w => `
+        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</div>
           <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
           <div class="score">${w.score ? w.score.thuis+'-'+w.score.uit : '<span class="badge">nog te spelen</span>'}</div>
         </div>`).join('')}</div>`
-    : '<div class="kaart">Nog geen wedstrijden ingepland.</div>';
+    : '<div class="kaart">Geen wedstrijden gevonden.</div>';
 }
 
 async function laden(){

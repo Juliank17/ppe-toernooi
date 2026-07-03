@@ -73,12 +73,22 @@ module.exports = async (req, res) => {
       return { id: d.id, naam: d.naam, poules, bracket, knockoutGestart: Boolean(bracketFase && bracketFase.gestart) };
     });
 
+    const baanNaam = (id) => {
+      const b = (t.banen || []).find((x) => x.id === id);
+      return b ? b.naam : (id || '');
+    };
+    const pouleNaamVan = (w) => {
+      for (const d of t.divisies || [])
+        for (const f of d.fases || [])
+          if (f.poules) { const p = f.poules.find((x) => x.id === w.groep); if (p) return p.naam; }
+      return null;
+    };
     const schema = (t.wedstrijden || [])
       .filter((w) => w.baan && w.tijd)
       .sort((a, b) => String(a.tijd).localeCompare(String(b.tijd)))
       .map((w) => ({
-        divisie: w.divisie, groep: w.groep, label: w.label || null,
-        baan: w.baan, tijd: w.tijd,
+        divisie: w.divisie, groep: w.groep, poule: pouleNaamVan(w), label: w.label || null,
+        baan: baanNaam(w.baan), tijd: w.tijd,
         thuis: naam(w.thuis), uit: naam(w.uit),
         score: w.score, status: w.status,
       }));
