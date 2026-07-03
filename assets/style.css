@@ -61,6 +61,8 @@ header.kop .sub { color: var(--grijs-2); }
 body.donker .kaart { background: var(--navy-2); color: var(--wit); border: 1px solid #1e3c66; box-shadow: none; }
 body.donker .kaart h2, body.donker .kaart h3 { color: var(--wit); }
 body.donker .kaart a { color: var(--lime); text-decoration-color: var(--lime); }
+body.donker .kaart a.btn { color: var(--navy); } /* lime knop: navy tekst */
+body.donker .kaart a.btn.sec { color: var(--wit); }
 body.donker .kaart label, body.donker .kaart .mini { color: var(--grijs-2); }
 body.donker input, body.donker select, body.donker textarea { background: #0d2445; border-color: #29497a; color: var(--wit); }
 body.donker .wed { border-bottom-color: #1e3c66; }
