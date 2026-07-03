@@ -159,14 +159,22 @@ function tekenVoortgang(){
 }
 
 /* --- Scores: gegroepeerd op tijd (per tijdblok alle banen onder elkaar) --- */
+const PALET = ['#C5E506','#4fc3f7','#ff9f43','#ee5253','#26de81','#fd79a8','#a29bfe','#feca57','#00d2d3','#ff6b81'];
 function baanNaam(id){ const b=(DATA.banen||[]).find(x=>x.id===id); return b?b.naam:(id||'Baan n.t.b.'); }
 function pouleNaam(w){
   for(const d of DATA.divisies){ const p=(d.poules||[]).find(x=>x.id===w.groep); if(p) return p.naam; }
   return null;
 }
-function wedLabel(w){
-  const p = pouleNaam(w);
-  return (w.groep==='ko' ? (w.label||'Knock-out') : (p||w.groep)) + ' · ' + divNaam(w.divisie);
+// Elke poule (over alle niveaus heen) een eigen kleur; knock-out paars-grijs
+function pouleKleur(w){
+  if(w.groep==='ko') return '#a29bfe';
+  let i=0;
+  for(const d of DATA.divisies) for(const p of (d.poules||[])){ if(p.id===w.groep) return PALET[i%PALET.length]; i++; }
+  return '#c9d3e0';
+}
+function wedTag(w){
+  const tekst = (w.groep==='ko' ? (w.label||'Knock-out') : (pouleNaam(w)||w.groep)) + ' · ' + divNaam(w.divisie);
+  return `<span style="background:${pouleKleur(w)};color:var(--navy);border-radius:4px;padding:1px 7px;font-weight:700;text-transform:none">${esc(tekst)}</span>`;
 }
 function tekenScores(){
   const filter = document.getElementById('filter').value;
@@ -175,8 +183,8 @@ function tekenScores(){
   const rij = w => {
     const klaar = w.status==='klaar';
     return `
-    <div class="wed ${klaar?'klaar':''} ${w.id===flitsId?'flits':''}">
-      <div><div class="meta">${esc(baanNaam(w.baan))} · ${esc(wedLabel(w))}
+    <div class="wed ${klaar?'klaar':''} ${w.id===flitsId?'flits':''}" ${klaar?'':`style="border-left:4px solid ${pouleKleur(w)}"`}>
+      <div><div class="meta">${esc(baanNaam(w.baan))} · ${wedTag(w)}
           ${klaar?` · <span class="ok-tag">✓ opgeslagen</span> <span class="wis" onclick="wisScore('${w.id}')">wis</span>`:''}</div>
         <div class="teams" ${w.voorlopig?'style="color:#8494ab;font-style:italic"':''}>${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       ${w.voorlopig
