@@ -138,4 +138,44 @@ test('teamOpPositie geeft de juiste doorstromer', () => {
   assert.strictEqual(T.teamOpPositie(teams, wedstrijden, cfgStandaard, 1), 'Rood');
 });
 
+console.log('\nEigen-poule-vermijding in ronde 1');
+
+test('zelfde-poule-duel wordt weggeruild', () => {
+  // Paren: (A1,A2) zelfde poule → moet ruilen met een ander paar
+  const poule = { A1: 'pA', A2: 'pA', B1: 'pB', B2: 'pB' };
+  const slots = ['A1', 'A2', 'B1', 'B2'];
+  T.vermijdEigenPoule(slots, (id) => poule[id]);
+  for (let i = 0; i < slots.length; i += 2) {
+    assert.notStrictEqual(poule[slots[i]], poule[slots[i + 1]],
+      `paar ${slots[i]}–${slots[i + 1]} komt uit dezelfde poule`);
+  }
+  // Alle teams moeten er nog exact één keer in staan
+  assert.deepStrictEqual([...slots].sort(), ['A1', 'A2', 'B1', 'B2']);
+});
+
+test('grotere bracket: geen eigen-poule-duels als het oplosbaar is', () => {
+  const poule = { A1:'pA',A2:'pA',B1:'pB',B2:'pB',C1:'pC',C2:'pC',D1:'pD',D2:'pD' };
+  // Bewust ongunstige volgorde: elk paar is een eigen-poule-duel
+  const slots = ['A1','A2','B1','B2','C1','C2','D1','D2'];
+  T.vermijdEigenPoule(slots, (id) => poule[id]);
+  for (let i = 0; i < slots.length; i += 2) {
+    assert.notStrictEqual(poule[slots[i]], poule[slots[i + 1]]);
+  }
+  assert.deepStrictEqual([...slots].sort(), ['A1','A2','B1','B2','C1','C2','D1','D2']);
+});
+
+test('onoplosbaar (alles uit één poule) blijft heel: geen teams kwijt', () => {
+  const slots = ['A1', 'A2', 'A3', 'A4'];
+  T.vermijdEigenPoule(slots, () => 'pA');
+  assert.deepStrictEqual([...slots].sort(), ['A1', 'A2', 'A3', 'A4']);
+});
+
+test('byes (null) worden met rust gelaten', () => {
+  const poule = { A1: 'pA', A2: 'pA', B1: 'pB' };
+  const slots = ['A1', null, 'B1', 'A2'];
+  T.vermijdEigenPoule(slots, (id) => poule[id]);
+  assert.strictEqual(slots[1], null, 'bye van seed 1 mag niet weggeruild worden');
+  assert.deepStrictEqual([...slots].filter(Boolean).sort(), ['A1', 'A2', 'B1']);
+});
+
 console.log('\n' + geslaagd + ' tests geslaagd.' + (process.exitCode ? ' (met fouten)' : ''));

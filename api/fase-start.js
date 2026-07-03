@@ -5,7 +5,7 @@
 const store = require('../lib/store');
 const { magSchrijven } = require('../lib/auth');
 const { leesBody, json, uid, cfgVan } = require('../lib/http');
-const { teamOpPositie, kwalificatieVolgorde, seedVolgorde } = require('../lib/tournament');
+const { teamOpPositie, kwalificatieVolgorde, seedVolgorde, vermijdEigenPoule } = require('../lib/tournament');
 
 module.exports = async (req, res) => {
   try {
@@ -58,6 +58,14 @@ module.exports = async (req, res) => {
         const seed = k + 1;
         if (seed <= grootte) slots[slotVoorSeed[seed]] = team;
       });
+      // Vermijd dat teams uit dezelfde poule elkaar in ronde 1 treffen
+      if ((pouleFase.poules || []).length > 1) {
+        const pouleVan = (teamId) => {
+          const p = pouleFase.poules.find((x) => (x.teams || []).includes(teamId));
+          return p ? p.id : null;
+        };
+        vermijdEigenPoule(slots, pouleVan);
+      }
     }
 
     // Eerste ronde invullen. Bij voorkeur in het bestaande skelet (behoudt de planning);
