@@ -48,11 +48,11 @@ function standTabel(p){
     <tr class="${r.gelijkstand?'tie':''}">
       <td>${r.positie}</td><td>${esc(r.teamNaam)}</td>
       <td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td>
-      <td>${r.DPV}</td><td>${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
+      <td class="uitgebreid">${r.DPV}</td><td class="uitgebreid">${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
       <td class="p">${r.P}</td></tr>`).join('');
-  return `<div class="kaart"><h3>${esc(p.naam)}</h3><table>
-    <tr><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th>DPV</th><th>DPT</th><th>+/-</th><th>P</th></tr>
-    ${rows}</table></div>`;
+  return `<div class="kaart"><h3>${esc(p.naam)}</h3><div class="tabelwrap"><table>
+    <tr><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th class="uitgebreid">DPV</th><th class="uitgebreid">DPT</th><th>+/-</th><th>P</th></tr>
+    ${rows}</table></div></div>`;
 }
 
 function bracketBlok(d){

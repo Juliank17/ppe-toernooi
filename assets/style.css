@@ -58,6 +58,7 @@ header.kop .sub { color: var(--grijs-2); }
 .kaart.donker a { color: var(--lime); }
 
 /* Tabellen */
+.tabelwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--grijs); }
 th { font-size: .7rem; text-transform: uppercase; color: var(--grijs-2); }
@@ -124,4 +125,9 @@ footer.vt { text-align: center; padding: 24px; color: var(--grijs-2); font-size:
   h1 { font-size: 1.5rem; }
   .kaart { padding: 14px; border-radius: 12px; }
   .wed { grid-template-columns: 1fr; }
+  /* Compacte tabellen: uitgebreide kolommen (klasse "uitgebreid") verbergen */
+  table { font-size: .82rem; }
+  th, td { padding: 7px 5px; }
+  .uitgebreid { display: none; }
+  .tabs button { min-width: 90px; padding: 12px 8px; }
 }

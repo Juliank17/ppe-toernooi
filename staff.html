@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PPE Toernooi — Personeel</title>
 <link rel="stylesheet" href="/assets/style.css">
+<style>
+  .scorein{display:flex;gap:6px;align-items:center}
+  .scorein input{width:58px;text-align:center;padding:10px 4px;font-size:1.05rem}
+  .scorein .btn{margin:0;padding:10px 14px;font-size:1rem}
+  .checkrij{display:flex;gap:10px;align-items:center;padding:11px 2px;border-bottom:1px solid #eee;text-transform:none;color:var(--navy);font-size:.95rem;margin:0;cursor:pointer}
+  .checkrij input{width:20px;height:20px}
+  @media (max-width:640px){
+    .scorein{width:100%}
+    .scorein input{flex:1;min-width:0;padding:12px 4px}
+    .scorein .btn{flex:0 0 auto;padding:12px 16px}
+  }
+</style>
 </head>
 <body>
 <header class="kop">
@@ -77,6 +89,7 @@ const slug = new URLSearchParams(location.search).get('slug')
 let DATA = null;
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function kort(s){ s=String(s??''); return s.length>9 ? s.slice(0,8)+'…' : s; }
 function divNaam(id){ const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; }
 function toon(id,on){ document.getElementById(id).classList.toggle('verborgen',!on); }
 function melding(el,tekst,ok){ el.innerHTML = tekst?`<div class="melding ${ok?'ok':'fout'}">${esc(tekst)}</div>`:''; }
@@ -114,10 +127,10 @@ function tekenScores(){
     <div class="wed">
       <div><div class="meta">${w.tijd?'⏱ '+esc(w.tijd)+' · ':''}${esc(w.baan||'baan n.t.b.')} · ${esc(w.label || (w.groep==='bracket'?'knock-out':w.groep))}</div>
         <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
-      <div style="display:flex;gap:4px;align-items:center">
-        <input style="width:52px" type="number" min="0" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}">
-        <input style="width:52px" type="number" min="0" id="s_u_${w.id}" value="${w.score?w.score.uit:''}">
-        <button class="btn" style="margin:0;padding:8px 10px" onclick="bewaarScore('${w.id}')">✓</button>
+      <div class="scorein">
+        <input type="number" min="0" inputmode="numeric" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}" placeholder="${esc(kort(w.thuis))}">
+        <input type="number" min="0" inputmode="numeric" id="s_u_${w.id}" value="${w.score?w.score.uit:''}" placeholder="${esc(kort(w.uit))}">
+        <button class="btn" onclick="bewaarScore('${w.id}')">✓</button>
       </div>
     </div>`;
   let html='';
@@ -139,13 +152,13 @@ function tekenCheckin(){
     if(!teams.length) continue;
     const aanwezig = teams.filter(t=>!t.afwezig).length;
     html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">${esc(d.naam)} <span class="mini">(${aanwezig}/${teams.length} aanwezig)</span></div>`
-      + teams.map(t=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eee;text-transform:none;color:var(--navy)">
-          <input type="checkbox" style="width:auto" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
+      + teams.map(t=>`<label class="checkrij">
+          <input type="checkbox" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
   }
   const rest = (DATA.teams||[]).filter(t=>!DATA.divisies.some(d=>d.id===t.divisie));
   if(rest.length) html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">Overig</div>`
-    + rest.map(t=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eee;text-transform:none;color:var(--navy)">
-        <input type="checkbox" style="width:auto" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
+    + rest.map(t=>`<label class="checkrij">
+        <input type="checkbox" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
   lijst.innerHTML = html || '<p class="mini">Nog geen teams ingeladen. Voeg ze hieronder toe of maak ze aan in de wizard.</p>';
 }
 async function toggleAanwezig(teamId, aanwezig){
