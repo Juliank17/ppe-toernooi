@@ -57,6 +57,27 @@ header.kop .sub { color: var(--grijs-2); }
 .kaart.donker h2, .kaart.donker h3 { color: var(--wit); }
 .kaart.donker a { color: var(--lime); }
 
+/* Donker thema: zet class "donker" op <body> en alle kaarten worden navy i.p.v. wit */
+body.donker .kaart { background: var(--navy-2); color: var(--wit); border: 1px solid #1e3c66; box-shadow: none; }
+body.donker .kaart h2, body.donker .kaart h3 { color: var(--wit); }
+body.donker .kaart a { color: var(--lime); text-decoration-color: var(--lime); }
+body.donker .kaart label, body.donker .kaart .mini { color: var(--grijs-2); }
+body.donker input, body.donker select, body.donker textarea { background: #0d2445; border-color: #29497a; color: var(--wit); }
+body.donker .wed { border-bottom-color: #1e3c66; }
+body.donker .wed:hover { background: #16315b; }
+body.donker .chip { background: #1e3c66; color: var(--wit); }
+body.donker .kaart a.chip { color: var(--wit); }
+body.donker .chip:hover, body.donker .kaart a.chip:hover { background: var(--lime); color: var(--navy); }
+body.donker .chip.gevaar, body.donker .kaart a.chip.gevaar { background: #5a1d20; color: #ffb3b6; }
+body.donker .chip.gevaar:hover, body.donker .kaart a.chip.gevaar:hover { background: var(--rood); color: var(--wit); }
+
+/* Inklapbare kaarten */
+details.kaart > summary { cursor: pointer; font-family: 'Anton', sans-serif; font-size: 1.15rem; letter-spacing: .5px; border-left: 4px solid var(--lime); padding-left: 10px; list-style: none; }
+details.kaart > summary::-webkit-details-marker { display: none; }
+details.kaart > summary::after { content: ' ▸'; color: var(--grijs-2); }
+details.kaart[open] > summary::after { content: ' ▾'; }
+details.kaart[open] > summary { margin-bottom: 12px; }
+
 /* Tabellen */
 .tabelwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }

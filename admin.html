@@ -7,16 +7,16 @@
 <link rel="stylesheet" href="/assets/style.css">
 <style>
   .badge{font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;vertical-align:2px;margin-left:6px}
-  .badge.s-concept{background:#dfe6ef;color:#41547a}
+  .badge.s-concept{background:#2a4a78;color:#c6d4e8}
   .badge.s-live{background:var(--lime);color:var(--navy)}
-  .badge.s-afgerond{background:var(--navy);color:#fff}
-  .badge.s-gearchiveerd{background:#ececec;color:#8a8a8a}
+  .badge.s-afgerond{background:transparent;color:var(--lime);border:1px solid var(--lime)}
+  .badge.s-gearchiveerd{background:#22334d;color:#7d8ba0}
   .wed .acties{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   @media (max-width:640px){ .wed .acties{justify-content:flex-start} }
   .schakel{display:flex!important;align-items:center;gap:8px;text-transform:none!important;font-size:.85rem!important;margin:2px 0 10px!important;cursor:pointer}
 </style>
 </head>
-<body>
+<body class="donker">
 <header class="kop">
   <div class="logo">PRIME PADEL EVENTS · BEHEER</div>
   <h1>Toernooibeheer</h1>
@@ -24,14 +24,15 @@
 
 <div class="wrap">
   <!-- Sleutel -->
-  <div class="kaart">
+  <details class="kaart" id="sleutelkaart">
+    <summary>Toegangssleutel</summary>
     <label>Interne sleutel (INTERNAL_KEY)</label>
     <div class="rij">
       <input id="key" type="password" placeholder="wordt lokaal onthouden">
       <button class="btn" style="flex:0" onclick="bewaarKey()">Onthoud</button>
     </div>
     <div id="keymelding" class="mini"></div>
-  </div>
+  </details>
 
   <!-- Overzicht -->
   <div class="kaart">
@@ -47,10 +48,10 @@
     </div>
   </div>
 
-  <!-- Nieuw -->
-  <div class="kaart">
-    <h2>Nieuw toernooi</h2>
-    <p class="mini" style="color:#5b6b82">Tip: gebruik de begeleide <a href="/nieuw.html">setup-wizard</a> om vorm, banen, niveaus en teams stap voor stap in te stellen. Hieronder is de snelle variant met voorbeeldstructuur.</p>
+  <!-- Geavanceerd: snel aanmaken zonder wizard -->
+  <details class="kaart">
+    <summary>Snel Aanmaken (Zonder Wizard)</summary>
+    <p class="mini">Maakt direct een toernooi met voorbeeldstructuur. Voor een normaal toernooi is de <a href="/nieuw.html">setup-wizard</a> de betere weg.</p>
     <div class="rij">
       <div><label>Naam</label><input id="n_naam"></div>
       <div><label>Slug (voor de URL)</label><input id="n_slug" placeholder="prime25april"></div>
@@ -62,16 +63,16 @@
     </div>
     <div id="nieuwmelding"></div>
     <button class="btn" onclick="maakNieuw()">Aanmaken (met voorbeeldstructuur)</button>
-  </div>
+  </details>
 
-  <!-- Bewerken -->
-  <div class="kaart">
-    <h2>Bewerken</h2>
+  <!-- Geavanceerd: JSON-editor (noodgereedschap) -->
+  <details class="kaart">
+    <summary>Geavanceerd: JSON-Editor</summary>
+    <p class="mini">Noodgereedschap: de volledige toernooistructuur als JSON. Normaal beheer doe je via "beheren" bij het toernooi hierboven.</p>
     <div class="rij">
       <div><label>Toernooi-id</label><input id="e_id"></div>
       <button class="btn sec" style="flex:0" onclick="laadToernooi()">Openen</button>
     </div>
-    <p class="mini" style="color:#5b6b82">Structuur (divisies, poules, teams, banen, puntentelling) als JSON. Pas aan en sla op. Een nettere UI komt later — dit geeft nu volledige controle.</p>
     <textarea id="e_json" rows="18" style="font-family:monospace;font-size:.8rem"></textarea>
     <div id="editmelding"></div>
     <div class="rij">
@@ -79,7 +80,7 @@
       <button class="btn sec" onclick="genereer()">Genereer poulewedstrijden</button>
     </div>
     <p class="mini" id="links"></p>
-  </div>
+  </details>
 </div>
 
 <footer class="vt">Alleen voor beheerders</footer>
@@ -92,6 +93,7 @@ function melding(id,t,ok){ document.getElementById(id).innerHTML = t?`<div class
 
 function bewaarKey(){ localStorage.setItem('ppe_key',document.getElementById('key').value); document.getElementById('keymelding').textContent='Opgeslagen in deze browser.'; laadOverzicht(); }
 document.getElementById('key').value = getKey();
+if(!getKey()) document.getElementById('sleutelkaart').open = true; // zonder sleutel: meteen tonen
 
 let alleToernooien = [];
 
