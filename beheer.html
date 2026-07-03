@@ -415,9 +415,39 @@ function drop(e,cel){
   e.preventDefault(); cel.classList.remove('over');
   const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(!w) return;
   snap();
-  const bez=T.wedstrijden.find(x=>x.baan===cel.dataset.baan&&x.tijd===cel.dataset.tijd&&x.id!==w.id);
-  if(bez){bez.baan=null;bez.tijd=null;}
-  w.baan=cel.dataset.baan; w.tijd=cel.dataset.tijd; tekenBoard();
+  schuifIn(w, cel.dataset.baan, cel.dataset.tijd);
+  tekenBoard();
+}
+// Volgende bespeelbare vak in leesvolgorde: rechts op dezelfde regel, daarna de volgende tijdregel.
+function volgendeVak(baanId,tijd){
+  const banen=T.banen||[], tijden=slots();
+  let bi=banen.findIndex(b=>b.id===baanId), ti=tijden.indexOf(tijd);
+  while(true){
+    bi++;
+    if(bi>=banen.length){ bi=0; ti++; if(ti>=tijden.length) return null; }
+    const b=banen[bi], t=tijden[ti];
+    if(!baanOpen(b,t) || blok(b.id,t)) continue;
+    return {baan:b.id, tijd:t};
+  }
+}
+// Plaats een wedstrijd op een vak; zit daar al een wedstrijd, dan schuift die door
+// naar het volgende vak (en zo verder — invoegen zoals in een tekstregel).
+function schuifIn(w,baanId,tijd){
+  let huidige=w, vak={baan:baanId,tijd};
+  const bezocht=new Set();
+  while(vak){
+    const key=vak.baan+'|'+vak.tijd;
+    if(bezocht.has(key)) break; // veiligheidsklep
+    bezocht.add(key);
+    const bez=T.wedstrijden.find(x=>x.baan===vak.baan&&x.tijd===vak.tijd&&x.id!==huidige.id);
+    huidige.baan=vak.baan; huidige.tijd=vak.tijd;
+    if(!bez) return;
+    huidige=bez;
+    vak=volgendeVak(vak.baan,vak.tijd);
+  }
+  // Raster vol: de laatste gaat terug naar "Niet gepland"
+  huidige.baan=null; huidige.tijd=null;
+  mgd('s_melding','Einde schema bereikt — één wedstrijd staat weer bij "Niet gepland".',false);
 }
 function autoVul(){
   const kies=new Set([...document.querySelectorAll('.vulopt:checked')].map(c=>c.dataset.key));
