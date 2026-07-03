@@ -9,13 +9,14 @@
   .scorein{display:flex;gap:6px;align-items:center}
   .scorein input{width:58px;text-align:center;padding:10px 4px;font-size:1.05rem}
   .scorein .btn{margin:0;padding:10px 14px;font-size:1rem}
-  .checkrij{display:flex;gap:10px;align-items:center;padding:11px 2px;border-bottom:1px solid #eee;text-transform:none;color:var(--navy);font-size:.95rem;margin:0;cursor:pointer}
+  .checkrij{display:flex;gap:10px;align-items:center;padding:11px 2px;border-bottom:1px solid #1e3c66;text-transform:none;color:#fff;font-size:.95rem;margin:0;cursor:pointer}
   .checkrij input{width:20px;height:20px}
-  .wed.klaar{background:#f0faf1;border-left:4px solid var(--groen)}
+  .wed.klaar{background:#14301c;border-left:4px solid var(--groen)}
   .wed.flits{animation:flits 1.5s ease}
-  @keyframes flits{0%{background:#9fe8ac}100%{background:#f0faf1}}
-  .ok-tag{color:var(--groen);font-weight:700}
-  .wis{color:#a1191d;font-size:.72rem;cursor:pointer;text-decoration:underline}
+  @keyframes flits{0%{background:#2e7d32}100%{background:#14301c}}
+  .ok-tag{color:#7ee08a;font-weight:700}
+  .wis{color:#ff9b9e;font-size:.72rem;cursor:pointer;text-decoration:underline}
+  .voortblok{border:1px solid #1e3c66;border-radius:10px;padding:10px 14px;min-width:170px;background:#0d2445}
   @media (max-width:640px){
     .scorein{width:100%}
     .scorein input{flex:1;min-width:0;padding:12px 4px}
@@ -23,7 +24,7 @@
   }
 </style>
 </head>
-<body>
+<body class="donker">
 <header class="kop">
   <div class="logo">PRIME PADEL EVENTS · PERSONEEL</div>
   <h1 id="titel">Personeel</h1>
@@ -64,7 +65,7 @@
     <div id="tab-aanmelden" class="verborgen">
       <div class="kaart">
         <h3>Check-in — aanwezige teams</h3>
-        <p class="mini" style="color:#5b6b82">Vink de teams af die aanwezig zijn. Een uitgevinkt team telt als <em>afwezig</em> en doet niet mee.</p>
+        <p class="mini">Vink de teams af die aanwezig zijn. Een uitgevinkt team telt als <em>afwezig</em> en doet niet mee.</p>
         <div id="checkinlijst"></div>
       </div>
       <div class="kaart">
@@ -148,10 +149,10 @@ function tekenVoortgang(){
         ? `<a class="mini" style="cursor:pointer;color:#a1191d" onclick="fase('${d.id}',true)">knock-out terugdraaien</a>`
         : `<button class="btn${pd<p.length?' sec':''}" style="margin:6px 0 0;padding:8px 12px;font-size:.75rem" onclick="fase('${d.id}',false)" ${pd<p.length?'title="Nog niet alle poulewedstrijden zijn ingevuld"':''}>Start knock-out ➜</button>`;
     }
-    return `<div style="border:1px solid var(--grijs);border-radius:10px;padding:10px 14px;min-width:170px">
+    return `<div class="voortblok">
       <div style="font-family:'Anton';margin-bottom:4px">${esc(d.naam)}</div>
-      <div class="mini" style="color:#5b6b82">Groepsfase <b style="color:var(--navy)">${pd}/${p.length}</b>
-        ${d.heeftKnockout?` · Knock-out <b style="color:var(--navy)">${kd}/${k.length}</b>`:''}</div>
+      <div class="mini">Groepsfase <b style="color:var(--lime)">${pd}/${p.length}</b>
+        ${d.heeftKnockout?` · Knock-out <b style="color:var(--lime)">${kd}/${k.length}</b>`:''}</div>
       ${knop}</div>`;
   }).join('');
   document.getElementById('voortgang').innerHTML =
@@ -215,12 +216,12 @@ function tekenCheckin(){
     const teams = (DATA.teams||[]).filter(t=>t.divisie===d.id);
     if(!teams.length) continue;
     const aanwezig = teams.filter(t=>!t.afwezig).length;
-    html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">${esc(d.naam)} <span class="mini">(${aanwezig}/${teams.length} aanwezig)</span></div>`
+    html += `<div class="kop2c" style="font-family:'Anton';color:var(--lime);margin:10px 0 4px">${esc(d.naam)} <span class="mini">(${aanwezig}/${teams.length} aanwezig)</span></div>`
       + teams.map(t=>`<label class="checkrij">
           <input type="checkbox" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
   }
   const rest = (DATA.teams||[]).filter(t=>!DATA.divisies.some(d=>d.id===t.divisie));
-  if(rest.length) html += `<div class="kop2c" style="font-family:'Anton';color:var(--navy);margin:10px 0 4px">Overig</div>`
+  if(rest.length) html += `<div class="kop2c" style="font-family:'Anton';color:var(--lime);margin:10px 0 4px">Overig</div>`
     + rest.map(t=>`<label class="checkrij">
         <input type="checkbox" ${t.afwezig?'':'checked'} onchange="toggleAanwezig('${t.id}',this.checked)"> ${esc(t.naam)}</label>`).join('');
   lijst.innerHTML = html || '<p class="mini">Nog geen teams ingeladen. Voeg ze hieronder toe of maak ze aan in de wizard.</p>';

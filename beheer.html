@@ -73,6 +73,14 @@
       </div>
 
       <div class="kaart">
+        <h3>Sponsoren</h3>
+        <p class="mini" style="color:#5b6b82">Zichtbaar voor spelers op de live-pagina ("Mede mogelijk gemaakt door"). Eén sponsor per regel, met eventueel een link: <code>Naam | https://site.nl</code></p>
+        <textarea id="g_sponsoren" rows="4" placeholder="TopSpin Plaza&#10;Padelshop.nl | https://padelshop.nl"></textarea>
+        <button class="btn" onclick="bewaarSponsoren()">Sponsoren opslaan</button>
+        <span id="sp_melding"></span>
+      </div>
+
+      <div class="kaart">
         <h3>Banen</h3>
         <p class="mini" style="color:#5b6b82">Stel per baan een start- én eindtijd in. Na de eindtijd worden er geen wedstrijden meer ingepland.</p>
         <div id="banen"></div>
@@ -177,6 +185,14 @@ function vulGegevens(){
   el('g_naam').value=T.naam||''; el('g_datum').value=T.datum||''; el('g_locatie').value=T.locatie||'';
   el('g_pin').value=T.personeelspin||''; el('g_status').value=T.status||'concept';
   el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=(T.wisseltijd==null?0:T.wisseltijd);
+  el('g_sponsoren').value=(T.sponsoren||[]).map(s=>s.url?`${s.naam} | ${s.url}`:s.naam).join('\n');
+}
+async function bewaarSponsoren(){
+  T.sponsoren = el('g_sponsoren').value.split('\n').map(s=>s.trim()).filter(Boolean).map(l=>{
+    const [naam,url]=l.split('|').map(x=>x.trim());
+    return url?{naam,url}:{naam};
+  });
+  await opslaan('sp_melding');
 }
 async function bewaarGegevens(){
   const oudeStap = step();

@@ -136,8 +136,12 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--n
 .rij > * { flex: 1; }
 
 .melding { padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: .9rem; }
-.melding.ok { background: rgba(70,167,88,.18); color: #bff0c7; }
-.melding.fout { background: rgba(229,72,77,.18); color: #ffc9cb; }
+/* Leesbaar op witte kaarten; donkere pagina's krijgen hieronder hun eigen variant */
+.melding.ok { background: #e2f4e5; color: #17662a; }
+.melding.fout { background: #fdeaea; color: #a1191d; }
+body.donker .melding.ok { background: rgba(70,167,88,.22); color: #bff0c7; }
+body.donker .melding.fout { background: rgba(229,72,77,.22); color: #ffc9cb; }
+body.donker th, body.donker td { border-bottom-color: #1e3c66; }
 .verborgen { display: none !important; }
 .mini { font-size: .78rem; color: var(--grijs-2); }
 footer.vt { text-align: center; padding: 24px; color: var(--grijs-2); font-size: .8rem; }

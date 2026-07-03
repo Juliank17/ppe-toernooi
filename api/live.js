@@ -96,6 +96,7 @@ module.exports = async (req, res) => {
     return json(res, 200, {
       naam: t.naam, datum: t.datum, locatie: t.locatie, status: t.status,
       banen: t.banen || [],
+      sponsoren: t.sponsoren || [],
       divisies,
       schema,
     });

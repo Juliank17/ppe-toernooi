@@ -6,11 +6,12 @@
 <title>PPE Toernooi — Live</title>
 <link rel="stylesheet" href="/assets/style.css">
 <style>
-  tr.ik td{ background:#f4fbd8; font-weight:700; }
+  tr.ik td{ background:#42561a; font-weight:700; }
   .teamkaart{ border-left:6px solid var(--lime); }
+  .sponsorpil{ display:inline-block; border:1px solid var(--lime); border-radius:999px; padding:5px 14px; font-weight:700; color:#fff; }
 </style>
 </head>
-<body>
+<body class="donker">
 <header class="kop">
   <div class="logo">PRIME PADEL EVENTS</div>
   <h1 id="titel">Toernooi laden…</h1>
@@ -37,6 +38,8 @@
   <div id="tab-info" class="verborgen">
     <div class="kaart"><h2>Toernooi-informatie</h2><p id="infotekst" class="mini"></p></div>
   </div>
+
+  <div id="sponsors"></div>
 </div>
 
 <footer class="vt">Live standen &amp; schema · Prime Padel Events</footer>
@@ -110,7 +113,7 @@ function teamBlok(zoek){
       <div class="score">${w.score?w.score.thuis+'-'+w.score.uit:'<span class="badge">nog te spelen</span>'}</div></div>`).join('');
   return `<div class="kaart teamkaart">
     <h3>${esc(r.teamNaam)}</h3>
-    <p class="mini" style="color:#5b6b82">${esc(d.naam)} · ${esc(p.naam)} · positie <b>${r.positie}</b> van ${p.stand.length} · ${r.P} punten (${r.W} winst, ${r.GL} gelijk, ${r.V} verlies)</p>
+    <p class="mini">${esc(d.naam)} · ${esc(p.naam)} · positie <b style="color:var(--lime)">${r.positie}</b> van ${p.stand.length} · ${r.P} punten (${r.W} winst, ${r.GL} gelijk, ${r.V} verlies)</p>
     ${rows||'<p class="mini">Nog geen wedstrijden ingepland.</p>'}
   </div>`;
 }
@@ -142,6 +145,17 @@ function teken(){
           <div class="score">${w.score ? w.score.thuis+'-'+w.score.uit : '<span class="badge">nog te spelen</span>'}</div>
         </div>`).join('')}</div>`
     : '<div class="kaart">Geen wedstrijden gevonden.</div>';
+
+  // Sponsoren (altijd zichtbaar, onder de tabs)
+  const sp=DATA.sponsoren||[];
+  document.getElementById('sponsors').innerHTML = sp.length
+    ? `<div class="kaart" style="padding:14px 16px;text-align:center">
+        <div class="mini" style="letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Mede mogelijk gemaakt door</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          ${sp.map(s=>{const pil=`<span class="sponsorpil">${esc(s.naam)}</span>`;
+            return s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener" style="text-decoration:none">${pil}</a>`:pil;}).join('')}
+        </div></div>`
+    : '';
 }
 
 async function laden(){
