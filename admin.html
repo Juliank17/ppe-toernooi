@@ -43,7 +43,6 @@
     <div id="overzicht" class="mini">Laden…</div>
     <div class="rij">
       <a class="btn" style="flex:0" href="/nieuw.html">+ Nieuw Toernooi</a>
-      <a class="btn sec" style="flex:0" href="/planning.html">Planbord</a>
       <button class="btn sec" style="flex:0" onclick="laadOverzicht()">Vernieuwen</button>
     </div>
   </div>
@@ -120,9 +119,9 @@ function renderOverzicht(){
         <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" style="text-decoration:none">${esc(t.naam)} →</a>
           <span class="badge s-${esc(t.status||'concept')}">${esc(t.status||'concept')}</span></div>
         <div class="meta">${esc(t.datum)}${t.locatie?' · '+esc(t.locatie):''}</div></div>
-        <div class="acties"><a class="chip" href="/beheer.html?id=${encodeURIComponent(t.id)}">Beheren</a><a class="chip" href="/live.html?slug=${encodeURIComponent(t.slug)}">Live</a><a class="chip" href="/staff.html?slug=${encodeURIComponent(t.slug)}">Personeel</a>${gearch
-               ? `<a class="chip" onclick="zetStatus('${esc(t.id)}','concept')">Herstel</a><a class="chip gevaar" onclick="verwijderDef('${esc(t.id)}')">Verwijder</a>`
-               : `<a class="chip" onclick="zetStatus('${esc(t.id)}','gearchiveerd')">Archiveer</a>`}</div></div>`;
+        <div class="acties"><a class="pil" href="/beheer.html?id=${encodeURIComponent(t.id)}">Beheren</a><a class="pil" href="/live.html?slug=${encodeURIComponent(t.slug)}">Live</a><a class="pil" href="/staff.html?slug=${encodeURIComponent(t.slug)}">Personeel</a>${gearch
+               ? `<a class="pil" onclick="zetStatus('${esc(t.id)}','concept')">Herstel</a><a class="pil gevaar" onclick="verwijderDef('${esc(t.id)}')">Verwijder</a>`
+               : `<a class="pil" onclick="zetStatus('${esc(t.id)}','gearchiveerd')">Archiveer</a>`}</div></div>`;
   }).join('') || 'Nog geen toernooien.';
   if(verborgen > 0 && !toonArchief){
     document.getElementById('overzicht').insertAdjacentHTML('beforeend',

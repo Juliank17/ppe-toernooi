@@ -9,14 +9,15 @@
   .terug { color:var(--lime); font-size:.8rem; text-decoration:none; }
   .board { border-collapse:collapse; width:100%; table-layout:fixed; }
   .board th,.board td{ border:1px solid #33456a; padding:0; }
-  .board th{ background:var(--navy-2); color:#fff; padding:6px 4px; font-size:.68rem; }
-  .board td.tijd{ background:var(--navy-2); color:var(--lime); font-family:'Anton'; font-size:.75rem; text-align:center; width:52px; }
-  .cel{ height:46px; vertical-align:top; }
+  .board th{ background:var(--navy-2); color:#fff; padding:7px 4px; font-size:.78rem; }
+  .board td.tijd{ background:var(--navy-2); color:var(--lime); font-family:'Anton'; font-size:.85rem; text-align:center; width:58px; }
+  .vulopt-label{ display:flex; gap:5px; align-items:center; text-transform:none; margin:0; font-size:.8rem; color:var(--navy); cursor:pointer; }
+  .cel{ height:56px; vertical-align:top; }
   .cel.over{ background:#1a3a1f; }
   .cel.dicht{ background:#0a1424; }
-  .cel.blok{ background:#3a2f10; color:#e8c96b; font-size:.66rem; text-align:center; }
-  .chip{ background:#fff; color:var(--navy); border-radius:5px; padding:3px 5px; margin:2px; font-size:.66rem; cursor:grab; border-left:4px solid var(--lime); line-height:1.15; }
-  .chip small{ display:block; color:#5b6b82; font-size:.58rem; text-transform:uppercase; }
+  .cel.blok{ background:#3a2f10; color:#e8c96b; font-size:.72rem; text-align:center; cursor:pointer; }
+  .chip{ background:#fff; color:var(--navy); border-radius:5px; padding:4px 6px; margin:2px; font-size:.78rem; cursor:grab; border-left:5px solid var(--lime); line-height:1.2; }
+  .chip small{ display:block; color:#5b6b82; font-size:.62rem; text-transform:uppercase; }
   .chip.conflict{ outline:2px solid var(--rood); }
   .strip{ display:flex; flex-wrap:wrap; gap:2px; max-height:160px; overflow:auto; }
   .teamrij{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
@@ -35,7 +36,7 @@
   <div class="sub" id="subtitel"></div>
 </header>
 
-<div class="wrap" style="max-width:1400px">
+<div class="wrap" style="max-width:1700px">
   <div id="geenkey" class="kaart verborgen">
     <p>Interne sleutel nodig. Vul 'm in op <a href="/admin.html">Beheer</a> en kom terug.</p>
   </div>
@@ -102,20 +103,24 @@
     <!-- SCHEMA -->
     <div id="tab-schema" class="verborgen">
       <div class="kaart">
+        <label>Automatisch invullen — kies wat</label>
+        <div id="vulopties" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px"></div>
         <div class="rij">
           <button class="btn" style="flex:0" onclick="autoVul()">Automatisch invullen</button>
+          <button class="btn sec" style="flex:0" onclick="stapTerug()">↶ Stap terug</button>
           <button class="btn sec" style="flex:0" onclick="leegSchema()">Schema leegmaken</button>
           <button class="btn" style="flex:0" onclick="bewaarSchema()">Schema opslaan</button>
           <span id="s_melding"></span>
         </div>
         <div class="rij" style="margin-top:8px;align-items:end">
-          <div><label>Pauze/blokkade — baan</label>
+          <div><label>Blokkade — baan</label>
             <select id="bl_baan"></select></div>
-          <div><label>Tijd</label><select id="bl_tijd"></select></div>
-          <div><label>Omschrijving</label><input id="bl_label" placeholder="Pauze / lunch"></div>
+          <div><label>Van</label><select id="bl_tijd"></select></div>
+          <div><label>T/m (optioneel)</label><select id="bl_tot"></select></div>
+          <div><label>Naam</label><input id="bl_label" placeholder="bv. Pauze, Lunch, Baan bezet"></div>
           <button class="btn sec" style="flex:0" onclick="voegBlokkade()">+ Blokkade</button>
         </div>
-        <p class="mini" style="color:#5b6b82">Sleep uit "Niet gepland" naar een vak. Kleur = niveau, paars = knock-out. Rood kader = team speelt op dat tijdstip al ergens anders. Donkere vakken = baan gesloten; oranje = pauze/blokkade.</p>
+        <p class="mini" style="color:#5b6b82">Sleep uit "Niet gepland" naar een vak. Kleur = niveau (knock-out heeft dezelfde kleur, met de ronde als label). Rood kader = team speelt op dat tijdstip al ergens anders. Donkere vakken = baan gesloten; oranje = blokkade (klik erop om te verwijderen).</p>
         <div class="strip" id="unplanned"></div>
         <div class="legenda" id="legenda"></div>
       </div>
@@ -150,7 +155,7 @@ const divKleur = did => { const i=(T.divisies||[]).findIndex(d=>d.id===did); ret
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
   ['overzicht','teams','schema','standen','delen'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
-  if(b.dataset.tab==='schema'){ vulBlokVelden(); tekenBoard(); }
+  if(b.dataset.tab==='schema'){ vulBlokVelden(); tekenVulOpties(); tekenBoard(); }
   if(b.dataset.tab==='standen') laadStanden();
   if(b.dataset.tab==='delen') tekenDelen();
 });
@@ -281,12 +286,44 @@ function chip(w){
   const ko=w.groep==='ko';
   const bez=teamsOpTijd(w.tijd,w.id);
   const conflict=w.tijd&&((w.thuis&&bez.has(w.thuis))||(w.uit&&bez.has(w.uit)));
-  const kleur = ko ? '#a29bfe' : divKleur(w.divisie);
-  const label = ko ? (w.label||'knock-out') : (divNaam(w.divisie)+' · '+w.groep);
+  const kleur = divKleur(w.divisie); // elk niveau z'n eigen kleur, ook in de knock-out
+  const label = divNaam(w.divisie) + ' · ' + (ko ? (w.label||'knock-out') : w.groep);
   const teams = `${naam(w.thuis)||'n.t.b.'} — ${naam(w.uit)||'n.t.b.'}`;
-  return `<div class="chip ${conflict?'conflict':''}" style="border-left-color:${kleur}" draggable="true" data-id="${w.id}"
+  return `<div class="chip ${conflict?'conflict':''}" style="border-left-color:${kleur};background:${kleur}1c" draggable="true" data-id="${w.id}"
      ondragstart="event.dataTransfer.setData('text',this.dataset.id)">
      <small>${esc(label)}</small>${esc(teams)}</div>`;
+}
+
+/* ---- Undo-geschiedenis (planning + blokkades) ---- */
+let HIST=[];
+function snap(){
+  HIST.push(JSON.stringify({
+    w:(T.wedstrijden||[]).map(x=>({id:x.id,baan:x.baan,tijd:x.tijd})),
+    b:T.blokkades||[]
+  }));
+  if(HIST.length>40) HIST.shift();
+}
+function stapTerug(){
+  const s=HIST.pop();
+  if(!s){ mgd('s_melding','Niets om terug te draaien.',false); return; }
+  const o=JSON.parse(s);
+  o.w.forEach(x=>{ const w=T.wedstrijden.find(y=>y.id===x.id); if(w){ w.baan=x.baan; w.tijd=x.tijd; } });
+  T.blokkades=o.b;
+  tekenBoard(); mgd('s_melding','Stap teruggedraaid — vergeet niet op te slaan.',true);
+}
+
+/* ---- Auto-invul opties (aanvinkbaar per niveau/fase) ---- */
+function tekenVulOpties(){
+  const opts=[];
+  for(const d of (T.divisies||[])){
+    if((T.wedstrijden||[]).some(w=>w.divisie===d.id && w.groep!=='ko'))
+      opts.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-div="${d.id}" data-soort="poule" checked>
+        <b style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${divKleur(d.id)}"></b> Poules ${esc(d.naam)}</label>`);
+    if((T.wedstrijden||[]).some(w=>w.divisie===d.id && w.groep==='ko'))
+      opts.push(`<label class="vulopt-label"><input type="checkbox" class="vulopt" data-div="${d.id}" data-soort="ko" checked>
+        <b style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${divKleur(d.id)}"></b> Knock-out ${esc(d.naam)}</label>`);
+  }
+  el('vulopties').innerHTML = opts.join('') || '<span class="mini">Nog geen wedstrijden — genereer eerst (tab Overzicht).</span>';
 }
 function tekenBoard(){
   if(!T) return;
@@ -312,58 +349,78 @@ function tekenBoard(){
   const up=el('unplanned');
   up.innerHTML=open.map(chip).join('')||'<p class="mini">Alles ingepland 🎉</p>';
   up.ondragover=e=>e.preventDefault();
-  up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w){w.baan=null;w.tijd=null;tekenBoard();} };
+  up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w){snap();w.baan=null;w.tijd=null;tekenBoard();} };
 
   el('legenda').innerHTML = (T.divisies||[]).map(d=>`<span><b style="background:${divKleur(d.id)}"></b>${esc(d.naam)}</span>`).join('')
-    + `<span><b style="background:#a29bfe"></b>Knock-out</span>`;
+    + `<span>· Knock-out = zelfde kleur als het niveau, met de ronde als label</span>`;
 }
 function drop(e,cel){
   e.preventDefault(); cel.classList.remove('over');
   const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(!w) return;
+  snap();
   const bez=T.wedstrijden.find(x=>x.baan===cel.dataset.baan&&x.tijd===cel.dataset.tijd&&x.id!==w.id);
   if(bez){bez.baan=null;bez.tijd=null;}
   w.baan=cel.dataset.baan; w.tijd=cel.dataset.tijd; tekenBoard();
 }
 function autoVul(){
+  const kies=new Set([...document.querySelectorAll('.vulopt:checked')].map(c=>c.dataset.div+'|'+c.dataset.soort));
+  if(!kies.size){ mgd('s_melding','Vink eerst aan wat je wilt invullen.',false); return; }
+  const doel=T.wedstrijden.filter(w=>(!w.baan||!w.tijd) && kies.has(w.divisie+'|'+(w.groep==='ko'?'ko':'poule')));
+  if(!doel.length){ mgd('s_melding','Geen open wedstrijden in de aangevinkte selectie.',false); return; }
+  snap();
   const banen=T.banen||[], tijden=slots();
-  for(const w of T.wedstrijden.filter(w=>!w.baan||!w.tijd)){
+  let gelukt=0;
+  for(const w of doel){
     let done=false;
     for(const tijd of tijden){ if(done)break;
       const teams=teamsOpTijd(tijd,w.id);
       if((w.thuis&&teams.has(w.thuis))||(w.uit&&teams.has(w.uit))) continue;
       for(const b of banen){
         if(!baanOpen(b,tijd) || blok(b.id,tijd)) continue;
-        if(!T.wedstrijden.some(x=>x.baan===b.id&&x.tijd===tijd)){ w.baan=b.id;w.tijd=tijd;done=true;break; }
+        if(!T.wedstrijden.some(x=>x.baan===b.id&&x.tijd===tijd)){ w.baan=b.id;w.tijd=tijd;done=true;gelukt++;break; }
       }
     }
   }
-  tekenBoard(); mgd('s_melding','Ingevuld — controleer en sla op.',true);
+  tekenBoard(); mgd('s_melding',`${gelukt} van ${doel.length} ingevuld — controleer en sla op.`,true);
 }
 function leegSchema(){
   if(!confirm('Weet je zeker dat je het hele schema wilt leegmaken? Alle wedstrijden gaan terug naar "Niet gepland".')) return;
+  snap();
   T.wedstrijden.forEach(w=>{ w.baan=null; w.tijd=null; });
-  tekenBoard(); mgd('s_melding','Schema leeggemaakt — vergeet niet op te slaan.',true);
+  tekenBoard(); mgd('s_melding','Schema leeggemaakt — vergeet niet op te slaan (of doe een stap terug).',true);
 }
 async function bewaarSchema(){ await opslaan('s_melding'); }
 
 /* ---- Blokkades / pauzes ---- */
 function vulBlokVelden(){
   el('bl_baan').innerHTML = '<option value="__alle">Alle banen</option>' + (T.banen||[]).map(b=>`<option value="${b.id}">${esc(b.naam)}</option>`).join('');
-  el('bl_tijd').innerHTML = slots().map(t=>`<option value="${t}">${t}</option>`).join('');
+  const ts=slots().map(t=>`<option value="${t}">${t}</option>`).join('');
+  el('bl_tijd').innerHTML = ts;
+  el('bl_tot').innerHTML = '<option value="">— zelfde slot —</option>' + ts;
 }
 function voegBlokkade(){
-  const baan=el('bl_baan').value, tijd=el('bl_tijd').value, label=el('bl_label').value||'Pauze';
-  if(!tijd) return;
+  const baan=el('bl_baan').value, van=el('bl_tijd').value, label=el('bl_label').value||'Pauze';
+  if(!van) return;
+  const ts=slots();
+  const i1=ts.indexOf(van);
+  let i2=el('bl_tot').value ? ts.indexOf(el('bl_tot').value) : i1;
+  if(i2<i1) i2=i1;
   const doelen = baan==='__alle' ? (T.banen||[]).map(b=>b.id) : [baan];
+  snap();
   T.blokkades = T.blokkades||[];
-  doelen.forEach(bid=>{
-    if(!T.blokkades.some(x=>x.baan===bid && x.tijd===tijd)) T.blokkades.push({baan:bid,tijd,label});
-    // zet een eventueel geplande wedstrijd op dat vak terug
-    T.wedstrijden.filter(w=>w.baan===bid&&w.tijd===tijd).forEach(w=>{w.baan=null;w.tijd=null;});
-  });
-  el('bl_label').value=''; tekenBoard();
+  for(let i=i1;i<=i2;i++){
+    const tijd=ts[i];
+    doelen.forEach(bid=>{
+      if(!T.blokkades.some(x=>x.baan===bid && x.tijd===tijd)) T.blokkades.push({baan:bid,tijd,label});
+      // zet een eventueel geplande wedstrijd op dat vak terug
+      T.wedstrijden.filter(w=>w.baan===bid&&w.tijd===tijd).forEach(w=>{w.baan=null;w.tijd=null;});
+    });
+  }
+  el('bl_label').value=''; el('bl_tot').value=''; tekenBoard();
+  mgd('s_melding','Blokkade toegevoegd — vergeet niet op te slaan.',true);
 }
 function verwijderBlokkade(baanId,tijd){
+  snap();
   T.blokkades = (T.blokkades||[]).filter(x=>!(x.baan===baanId && x.tijd===tijd));
   tekenBoard();
 }

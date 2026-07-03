@@ -67,11 +67,11 @@ body.donker .kaart label, body.donker .kaart .mini { color: var(--grijs-2); }
 body.donker input, body.donker select, body.donker textarea { background: #0d2445; border-color: #29497a; color: var(--wit); }
 body.donker .wed { border-bottom-color: #1e3c66; }
 body.donker .wed:hover { background: #16315b; }
-body.donker .chip { background: #1e3c66; color: var(--wit); }
-body.donker .kaart a.chip { color: var(--wit); }
-body.donker .chip:hover, body.donker .kaart a.chip:hover { background: var(--lime); color: var(--navy); }
-body.donker .chip.gevaar, body.donker .kaart a.chip.gevaar { background: #5a1d20; color: #ffb3b6; }
-body.donker .chip.gevaar:hover, body.donker .kaart a.chip.gevaar:hover { background: var(--rood); color: var(--wit); }
+body.donker .pil { background: #1e3c66; color: var(--wit); }
+body.donker .kaart a.pil { color: var(--wit); }
+body.donker .pil:hover, body.donker .kaart a.pil:hover { background: var(--lime); color: var(--navy); }
+body.donker .pil.gevaar, body.donker .kaart a.pil.gevaar { background: #5a1d20; color: #ffb3b6; }
+body.donker .pil.gevaar:hover, body.donker .kaart a.pil.gevaar:hover { background: var(--rood); color: var(--wit); }
 
 /* Inklapbare kaarten */
 details.kaart > summary { cursor: pointer; font-family: 'Anton', sans-serif; font-size: 1.15rem; letter-spacing: .5px; border-left: 4px solid var(--lime); padding-left: 10px; list-style: none; }
@@ -121,17 +121,17 @@ input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--n
 .kaart a.btn { text-decoration: none; }
 .btn:disabled { opacity: .5; cursor: default; }
 /* Kleine actie-knopjes (pillen) voor lijstregels */
-.chip {
+.pil {
   display: inline-block; padding: 5px 11px; border-radius: 999px; cursor: pointer;
   background: var(--grijs); color: var(--navy); font-size: .72rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .3px; text-decoration: none; white-space: nowrap;
 }
-.chip:hover { background: var(--lime); }
-.kaart a.chip { color: var(--navy); text-decoration: none; }
-.chip.gevaar { background: #fbe4e5; color: #a1191d; }
-.chip.gevaar:hover { background: var(--rood); color: var(--wit); }
-.kaart a.chip.gevaar { color: #a1191d; }
-.kaart a.chip.gevaar:hover { color: var(--wit); }
+.pil:hover { background: var(--lime); }
+.kaart a.pil { color: var(--navy); text-decoration: none; }
+.pil.gevaar { background: #fbe4e5; color: #a1191d; }
+.pil.gevaar:hover { background: var(--rood); color: var(--wit); }
+.kaart a.pil.gevaar { color: #a1191d; }
+.kaart a.pil.gevaar:hover { color: var(--wit); }
 .rij { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
 .rij > * { flex: 1; }
 
