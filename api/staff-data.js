@@ -4,6 +4,7 @@
 const store = require('../lib/store');
 const { magSchrijven } = require('../lib/auth');
 const { json } = require('../lib/http');
+const { seedVolgorde } = require('../lib/tournament');
 
 module.exports = async (req, res) => {
   try {
@@ -18,6 +19,40 @@ module.exports = async (req, res) => {
       return tm ? tm.naam : (id || 'n.t.b.');
     };
 
+    // Placeholders voor lege knock-out-plekken (zelfde aanpak als de live-API):
+    // ronde 1 op basis van de plaatsing, daarna "Winnaar <vorige ronde>".
+    const koCtx = {};
+    for (const d of t.divisies || []) {
+      const bf = d.fases.find((f) => f.type === 'bracket');
+      if (!bf) continue;
+      const pf = d.fases.find((f) => f.type === 'poule');
+      const G = bf.grootte || 0;
+      koCtx[d.id] = {
+        ws: (t.wedstrijden || []).filter((w) => w.fase === bf.id),
+        sv: G >= 2 ? seedVolgorde(G) : [],
+        poules: pf ? (pf.poules || []) : [],
+      };
+    }
+    const plek = (w, kant) => {
+      const teamId = kant === 0 ? w.thuis : w.uit;
+      if (teamId) return naam(teamId);
+      const ctx = w.groep === 'ko' ? koCtx[w.divisie] : null;
+      if (!ctx) return 'n.t.b.';
+      const r = w.ronde || 1, i = w.koIndex || 0;
+      if (r === 1) {
+        const k = ctx.sv[2 * i + kant];
+        if (!k) return 'n.t.b.';
+        const P = ctx.poules.length;
+        if (!P) return `Geplaatste #${k}`;
+        const positie = Math.floor((k - 1) / P) + 1;
+        if (P === 1) return `Nr. ${k} ${ctx.poules[0].naam}`;
+        const j = k - (positie - 1) * P;
+        return (j === 1 ? 'Beste' : j + 'e') + ` nr. ${positie}`;
+      }
+      const kind = ctx.ws.find((x) => (x.ronde || 1) === r - 1 && (x.koIndex || 0) === 2 * i + kant);
+      return 'Winnaar ' + (kind && kind.label ? kind.label : 'KO-ronde ' + (r - 1));
+    };
+
     return json(res, 200, {
       id: t.id, naam: t.naam, slug: t.slug,
       banen: (t.banen || []).map((b) => ({ id: b.id, naam: b.naam })),
@@ -30,7 +65,8 @@ module.exports = async (req, res) => {
       })),
       wedstrijden: (t.wedstrijden || []).map((w) => ({
         id: w.id, divisie: w.divisie, groep: w.groep, ronde: w.ronde, label: w.label || null,
-        thuis: naam(w.thuis), uit: naam(w.uit),
+        thuis: plek(w, 0), uit: plek(w, 1),
+        voorlopig: w.groep === 'ko' && (!w.thuis || !w.uit),
         baan: w.baan, tijd: w.tijd, score: w.score, status: w.status,
       })),
     });

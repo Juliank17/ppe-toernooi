@@ -11,6 +11,11 @@
   .scorein .btn{margin:0;padding:10px 14px;font-size:1rem}
   .checkrij{display:flex;gap:10px;align-items:center;padding:11px 2px;border-bottom:1px solid #eee;text-transform:none;color:var(--navy);font-size:.95rem;margin:0;cursor:pointer}
   .checkrij input{width:20px;height:20px}
+  .wed.klaar{background:#f0faf1;border-left:4px solid var(--groen)}
+  .wed.flits{animation:flits 1.5s ease}
+  @keyframes flits{0%{background:#9fe8ac}100%{background:#f0faf1}}
+  .ok-tag{color:var(--groen);font-weight:700}
+  .wis{color:#a1191d;font-size:.72rem;cursor:pointer;text-decoration:underline}
   @media (max-width:640px){
     .scorein{width:100%}
     .scorein input{flex:1;min-width:0;padding:12px 4px}
@@ -49,7 +54,7 @@
           <div><label>Filter</label>
             <select id="filter" onchange="tekenScores()">
               <option value="open">Alleen nog in te vullen</option>
-              <option value="alle">Alle wedstrijden</option>
+              <option value="alle">Alle wedstrijden (scores wijzigen)</option>
             </select></div>
         </div>
       </div>
@@ -104,6 +109,23 @@ async function laadData(){
   document.getElementById('titel').textContent = DATA.naam;
   toon('login',false); toon('app',true);
   vulDivisies(); tekenVoortgang(); tekenScores(); tekenCheckin();
+  stelKnockoutVoor();
+}
+
+/* Poulefase compleet? Stel dan één keer voor om de knock-out te starten. */
+const KO_GEVRAAGD = new Set();
+function stelKnockoutVoor(){
+  for(const d of DATA.divisies){
+    if(!d.heeftKnockout || d.knockoutGestart || KO_GEVRAAGD.has(d.id)) continue;
+    const p = DATA.wedstrijden.filter(w=>w.divisie===d.id && w.groep!=='ko');
+    if(p.length && p.every(w=>w.status==='klaar')){
+      KO_GEVRAAGD.add(d.id);
+      if(confirm(`Alle poulewedstrijden van ${d.naam} zijn ingevuld! 🎾\n\nKnock-outfase van ${d.naam} nu starten?`)){
+        fase(d.id, false, true);
+        return; // na het starten herlaadt de pagina de data; volgende divisie komt dan vanzelf
+      }
+    }
+  }
 }
 
 async function login(){
@@ -124,7 +146,7 @@ function tekenVoortgang(){
     if(d.heeftKnockout){
       knop = d.knockoutGestart
         ? `<a class="mini" style="cursor:pointer;color:#a1191d" onclick="fase('${d.id}',true)">knock-out terugdraaien</a>`
-        : `<button class="btn" style="margin:6px 0 0;padding:8px 12px;font-size:.75rem" onclick="fase('${d.id}',false)" ${pd<p.length?'title="Nog niet alle poulewedstrijden zijn ingevuld"':''}>Start knock-out ➜</button>`;
+        : `<button class="btn${pd<p.length?' sec':''}" style="margin:6px 0 0;padding:8px 12px;font-size:.75rem" onclick="fase('${d.id}',false)" ${pd<p.length?'title="Nog niet alle poulewedstrijden zijn ingevuld"':''}>Start knock-out ➜</button>`;
     }
     return `<div style="border:1px solid var(--grijs);border-radius:10px;padding:10px 14px;min-width:170px">
       <div style="font-family:'Anton';margin-bottom:4px">${esc(d.naam)}</div>
@@ -149,17 +171,23 @@ function wedLabel(w){
 function tekenScores(){
   const filter = document.getElementById('filter').value;
   let ws = DATA.wedstrijden.slice();
-  if(filter==='open') ws = ws.filter(w=>w.status!=='klaar');
-  const rij = w => `
-    <div class="wed">
-      <div><div class="meta">${esc(baanNaam(w.baan))} · ${esc(wedLabel(w))}</div>
-        <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
-      <div class="scorein">
+  if(filter==='open') ws = ws.filter(w=>w.status!=='klaar' || w.id===flitsId); // net opgeslagen even laten staan
+  const rij = w => {
+    const klaar = w.status==='klaar';
+    return `
+    <div class="wed ${klaar?'klaar':''} ${w.id===flitsId?'flits':''}">
+      <div><div class="meta">${esc(baanNaam(w.baan))} · ${esc(wedLabel(w))}
+          ${klaar?` · <span class="ok-tag">✓ opgeslagen</span> <span class="wis" onclick="wisScore('${w.id}')">wis</span>`:''}</div>
+        <div class="teams" ${w.voorlopig?'style="color:#8494ab;font-style:italic"':''}>${esc(w.thuis)} — ${esc(w.uit)}</div></div>
+      ${w.voorlopig
+        ? '<span class="mini" style="color:#8494ab">nog te bepalen</span>'
+        : `<div class="scorein">
         <input type="number" min="0" inputmode="numeric" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}" placeholder="${esc(kort(w.thuis))}">
         <input type="number" min="0" inputmode="numeric" id="s_u_${w.id}" value="${w.score?w.score.uit:''}" placeholder="${esc(kort(w.uit))}">
-        <button class="btn" onclick="bewaarScore('${w.id}')">✓</button>
-      </div>
+        <button class="btn" onclick="bewaarScore('${w.id}')" title="${klaar?'Score wijzigen':'Score opslaan'}">✓</button>
+      </div>`}
     </div>`;
+  };
   const tijden = [...new Set(ws.filter(w=>w.tijd).map(w=>w.tijd))].sort((a,b)=>String(a).localeCompare(String(b)));
   let html='';
   for(const tijd of tijden){
@@ -196,13 +224,27 @@ async function toggleAanwezig(teamId, aanwezig){
   tekenCheckin();
 }
 
+let flitsId=null;
 async function bewaarScore(wid){
   const t = document.getElementById('s_t_'+wid).value;
   const u = document.getElementById('s_u_'+wid).value;
   if(t===''||u==='') return;
   const r = await fetch('/api/score',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:DATA.id,wedstrijdId:wid,score:{thuis:+t,uit:+u}})});
-  if(r.ok) laadData();
+  if(r.ok){
+    flitsId=wid;
+    await laadData();
+    setTimeout(()=>{ flitsId=null; }, 1600);
+  } else {
+    const j=await r.json().catch(()=>({}));
+    alert(j.fout||'Opslaan mislukt — probeer opnieuw.');
+  }
+}
+async function wisScore(wid){
+  if(!confirm('Deze score wissen? De wedstrijd staat daarna weer als "nog in te vullen".')) return;
+  const r = await fetch('/api/score',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:DATA.id,wedstrijdId:wid,leeg:true})});
+  if(r.ok) laadData(); else alert('Wissen mislukt.');
 }
 
 /* --- Aanmelden --- */
@@ -233,8 +275,8 @@ async function aanmelden(){
 }
 
 /* --- Knock-outfase starten / terugdraaien --- */
-async function fase(divisieId,terug){
-  if(!terug && !confirm('Knock-outfase starten op basis van de huidige eindstanden?')) return;
+async function fase(divisieId,terug,zonderVraag){
+  if(!zonderVraag && !terug && !confirm('Knock-outfase starten op basis van de huidige eindstanden?')) return;
   if(terug && !confirm('Knock-out terugdraaien? De knock-out-uitslagen worden gewist, de planning blijft staan.')) return;
   const r = await fetch('/api/fase-start',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:DATA.id,divisieId,terug})});
