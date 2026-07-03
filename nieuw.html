@@ -272,7 +272,7 @@ function bouwToernooi(){
   const divisies=[], teams=[];
   for(const d of leesDivisies()){
     const namen = effTeams(d.id);
-    const ids = namen.map(n=>{ const id='tm'+(++teamTeller); teams.push({id,naam:n,divisie:d.id}); return id; });
+    const ids = namen.map(n=>{ const id='tm'+(++teamTeller); teams.push({id,naam:n,divisie:d.id,afwezig:true}); return id; }); // aanwezig standaard uit: check-in op de dag zelf
     const fases=[];
     const heeftPoule = vorm()!=='ko';
     const heeftKO = vorm()!=='poule';
@@ -355,8 +355,10 @@ async function aanmakenEnGenereren(){
   el('genknop').disabled=false;
 }
 
-/* init */
-voegDivisieToe('Hoofdtoernooi');
+/* init — standaard drie niveaus (meest voorkomende opzet) */
+voegDivisieToe('Beginner');
+voegDivisieToe('Beginner+');
+voegDivisieToe('Intermediate');
 maakBanen();
 ganaar(0);
 </script>

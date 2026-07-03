@@ -245,7 +245,14 @@ function tekenTeams(){
         <input type="text" value="${esc(tm.naam)}" oninput="hernoem('${tm.id}',this.value)">
         <button class="weg" onclick="verwijderTeam('${tm.id}')">×</button>
       </div>`).join('');
-    html += `<button class="btn sec" onclick="voegTeam('${d.id}')">+ Team toevoegen</button></div>`;
+    html += `<button class="btn sec" onclick="voegTeam('${d.id}')">+ Team toevoegen</button>
+      <details style="margin-top:10px">
+        <summary class="mini" style="cursor:pointer">Teamnamen in één keer plakken</summary>
+        <label>Eén naam per regel</label>
+        <textarea id="bulk_${d.id}" rows="6" placeholder="Jan & Piet&#10;Kees & Bram&#10;…"></textarea>
+        <p class="mini" style="color:#5b6b82">De namen vervangen in volgorde de bestaande teamnamen van dit niveau; extra namen worden nieuwe teams (verdeeld over de poules).</p>
+        <button class="btn sec" onclick="bulkNamen('${d.id}')">Namen toepassen</button>
+      </details></div>`;
   }
   el('teamslijst').innerHTML = html || '<div class="kaart">Geen niveaus.</div>';
 }
@@ -259,10 +266,33 @@ function verwijderTeam(tid){
 }
 function voegTeam(divId){
   const nid='tm'+Date.now();
-  T.teams.push({id:nid,naam:'Nieuw team',divisie:divId,afwezig:false});
-  const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
-  if(pf&&pf.poules&&pf.poules[0]){ pf.poules[0].teams=pf.poules[0].teams||[]; pf.poules[0].teams.push(nid); }
+  T.teams.push({id:nid,naam:'Nieuw team',divisie:divId,afwezig:true}); // aanwezig standaard uit
+  voegInKleinstePoule(divId,nid);
   tekenTeams();
+}
+function voegInKleinstePoule(divId,teamId){
+  const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
+  if(!pf||!pf.poules||!pf.poules.length) return;
+  const p=pf.poules.reduce((a,b)=>((a.teams||[]).length<=(b.teams||[]).length?a:b));
+  p.teams=p.teams||[]; p.teams.push(teamId);
+}
+function bulkNamen(divId){
+  const ta=el('bulk_'+divId);
+  const namen=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!namen.length) return;
+  const bestaand=(T.teams||[]).filter(t=>t.divisie===divId);
+  let hernoemd=0, nieuw=0;
+  namen.forEach((n,i)=>{
+    if(i<bestaand.length){ bestaand[i].naam=n; hernoemd++; }
+    else{
+      const nid='tm'+Date.now()+'_'+i;
+      T.teams.push({id:nid,naam:n,divisie:divId,afwezig:true});
+      voegInKleinstePoule(divId,nid);
+      nieuw++;
+    }
+  });
+  tekenTeams();
+  mgd('t_melding',`${hernoemd} namen toegepast${nieuw?`, ${nieuw} nieuwe teams`:''} — vergeet niet op te slaan.`,true);
 }
 async function bewaarTeams(){ await opslaan('t_melding'); tekenTeams(); }
 

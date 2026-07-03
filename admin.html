@@ -60,8 +60,14 @@
       <div><label>Locatie</label><input id="n_locatie"></div>
       <div><label>Personeel-PIN</label><input id="n_pin"></div>
     </div>
+    <label>Niveaus</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <label class="schakel"><input type="checkbox" class="nivo" value="Beginner" checked> Beginner</label>
+      <label class="schakel"><input type="checkbox" class="nivo" value="Beginner+" checked> Beginner+</label>
+      <label class="schakel"><input type="checkbox" class="nivo" value="Intermediate" checked> Intermediate</label>
+    </div>
     <div id="nieuwmelding"></div>
-    <button class="btn" onclick="maakNieuw()">Aanmaken (met voorbeeldstructuur)</button>
+    <button class="btn" onclick="maakNieuw()">Aanmaken</button>
   </details>
 
   <!-- Geavanceerd: JSON-editor (noodgereedschap) -->
@@ -147,22 +153,25 @@ async function verwijderDef(id){
 }
 
 function voorbeeldStructuur(){
+  const nivos = [...document.querySelectorAll('.nivo:checked')].map(c=>c.value);
+  if(!nivos.length) nivos.push('Hoofdtoernooi');
+  const divisies = nivos.map((naam,i)=>{
+    const id='d'+(i+1);
+    return {
+      id, naam,
+      fases:[
+        {id:id+'_poule',type:'poule',poules:[{id:id+'_pA',naam:'Poule A',teams:[]}]},
+        {id:id+'_ko',type:'bracket',grootte:4,kwalificatie:'beste',doorstroom:[]}
+      ]
+    };
+  });
   return {
     banen: [{id:'b1',naam:'Baan 1',type:'indoor',starttijd:'10:00'},{id:'b2',naam:'Baan 2',type:'indoor',starttijd:'10:00'}],
     wedstrijdduur:20, wisseltijd:5,
     scoreType:'punten', punten:{winst:3,gelijk:1,verlies:0},
     tiebreakers:['punten','onderling','saldo','voor','gewonnen'], h2hIteratief:true,
-    teams:[
-      {id:'tm1',naam:'Team 1',divisie:'d1'},{id:'tm2',naam:'Team 2',divisie:'d1'},
-      {id:'tm3',naam:'Team 3',divisie:'d1'},{id:'tm4',naam:'Team 4',divisie:'d1'}
-    ],
-    divisies:[{
-      id:'d1', naam:'Beginner',
-      fases:[
-        {id:'f_poule',type:'poule',poules:[{id:'pA',naam:'Poule A',teams:['tm1','tm2','tm3','tm4']}]},
-        {id:'f_ko',type:'bracket',grootte:2,doorstroom:[{van:'pA#1',slot:0},{van:'pA#2',slot:1}]}
-      ]
-    }]
+    teams:[],
+    divisies
   };
 }
 
