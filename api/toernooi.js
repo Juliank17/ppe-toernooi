@@ -52,6 +52,14 @@ module.exports = async (req, res) => {
       return json(res, 200, { ok: true, id: t.id, slug: t.slug });
     }
 
+    if (req.method === 'DELETE') {
+      if (!isAdmin(req)) return json(res, 401, { fout: 'Geen toegang' });
+      const { id } = req.query || {};
+      if (!id) return json(res, 400, { fout: 'id is verplicht' });
+      const ok = await store.verwijderToernooi(id);
+      return ok ? json(res, 200, { ok: true }) : json(res, 404, { fout: 'Niet gevonden' });
+    }
+
     return json(res, 405, { fout: 'Methode niet toegestaan' });
   } catch (e) {
     return json(res, 500, { fout: e.message });

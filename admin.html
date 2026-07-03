@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PPE Toernooi — Beheer</title>
 <link rel="stylesheet" href="/assets/style.css">
+<style>
+  .badge.s-concept{background:#c9d3e0;color:var(--navy)}
+  .badge.s-live{background:var(--lime);color:var(--navy)}
+  .badge.s-afgerond{background:var(--navy);color:#fff}
+  .badge.s-gearchiveerd{background:#e4e4e4;color:#8a8a8a}
+  .wed .acties{font-size:.78rem;white-space:nowrap}
+  .wed .acties a{cursor:pointer}
+  .wed .acties .gevaar{color:#c00}
+</style>
 </head>
 <body>
 <header class="kop">
@@ -26,6 +35,9 @@
   <!-- Overzicht -->
   <div class="kaart">
     <h2>Toernooien</h2>
+    <label class="mini" style="display:block;margin-bottom:6px">
+      <input type="checkbox" id="toonArchief" onchange="renderOverzicht()"> Toon gearchiveerde
+    </label>
     <div id="overzicht" class="mini">Laden…</div>
     <div class="rij">
       <button class="btn sec" style="flex:0" onclick="laadOverzicht()">Vernieuwen</button>
@@ -80,19 +92,60 @@ function melding(id,t,ok){ document.getElementById(id).innerHTML = t?`<div class
 function bewaarKey(){ localStorage.setItem('ppe_key',document.getElementById('key').value); document.getElementById('keymelding').textContent='Opgeslagen in deze browser.'; laadOverzicht(); }
 document.getElementById('key').value = getKey();
 
+let alleToernooien = [];
+
 async function laadOverzicht(){
   try{
     const r = await fetch('/api/toernooi',{headers:hdr()});
     if(r.status===401){ document.getElementById('overzicht').innerHTML='<span style="color:#c00">Sleutel ontbreekt of onjuist.</span>'; return; }
     const j = await r.json();
-    document.getElementById('overzicht').innerHTML = (j.toernooien||[]).map(t=>`
-      <div class="wed"><div>
-        <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" style="text-decoration:none">${esc(t.naam)} →</a></div>
-        <div class="meta">${esc(t.datum)} · ${esc(t.status)}</div></div>
-        <div><a href="/beheer.html?id=${encodeURIComponent(t.id)}">beheren</a> ·
-             <a href="/live.html?slug=${encodeURIComponent(t.slug)}">live</a> ·
-             <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">personeel</a></div></div>`).join('') || 'Nog geen toernooien.';
+    alleToernooien = j.toernooien||[];
+    renderOverzicht();
   }catch(e){ document.getElementById('overzicht').textContent='Fout bij laden.'; }
+}
+
+function renderOverzicht(){
+  const toonArchief = document.getElementById('toonArchief').checked;
+  const lijst = alleToernooien
+    .filter(t => toonArchief || t.status !== 'gearchiveerd')
+    .sort((a,b) => String(b.datum||'').localeCompare(String(a.datum||''))); // nieuwste eerst
+  const verborgen = alleToernooien.length - lijst.length;
+  document.getElementById('overzicht').innerHTML = lijst.map(t=>{
+    const gearch = t.status === 'gearchiveerd';
+    return `
+      <div class="wed"><div>
+        <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" style="text-decoration:none">${esc(t.naam)} →</a>
+          <span class="badge s-${esc(t.status||'concept')}">${esc(t.status||'concept')}</span></div>
+        <div class="meta">${esc(t.datum)}${t.locatie?' · '+esc(t.locatie):''}</div></div>
+        <div class="acties"><a href="/beheer.html?id=${encodeURIComponent(t.id)}">beheren</a> ·
+             <a href="/live.html?slug=${encodeURIComponent(t.slug)}">live</a> ·
+             <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">personeel</a> ·
+             ${gearch
+               ? `<a onclick="zetStatus('${esc(t.id)}','concept')">herstel</a> ·
+                  <a class="gevaar" onclick="verwijderDef('${esc(t.id)}')">verwijder</a>`
+               : `<a onclick="zetStatus('${esc(t.id)}','gearchiveerd')">archiveer</a>`}</div></div>`;
+  }).join('') || 'Nog geen toernooien.';
+  if(verborgen > 0 && !toonArchief){
+    document.getElementById('overzicht').insertAdjacentHTML('beforeend',
+      `<div class="mini" style="padding:8px 12px;color:#5b6b82">${verborgen} gearchiveerd toernooi${verborgen===1?'':'en'} verborgen.</div>`);
+  }
+}
+
+async function zetStatus(id, status){
+  const r = await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify({id,status})});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); alert(j.fout||'Mislukt'); }
+  laadOverzicht();
+}
+
+async function verwijderDef(id){
+  const t = alleToernooien.find(x=>x.id===id);
+  if(!t) return;
+  const invoer = prompt(`DEFINITIEF verwijderen (kan niet ongedaan worden gemaakt).\nTyp ter bevestiging de naam van het toernooi:\n\n${t.naam}`);
+  if(invoer === null) return;
+  if(invoer.trim() !== t.naam){ alert('Naam komt niet overeen — er is niets verwijderd.'); return; }
+  const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{method:'DELETE',headers:hdr()});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); alert(j.fout||'Verwijderen mislukt'); }
+  laadOverzicht();
 }
 
 function voorbeeldStructuur(){
