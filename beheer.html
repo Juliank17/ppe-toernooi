@@ -176,7 +176,7 @@ async function laad(){
 function vulGegevens(){
   el('g_naam').value=T.naam||''; el('g_datum').value=T.datum||''; el('g_locatie').value=T.locatie||'';
   el('g_pin').value=T.personeelspin||''; el('g_status').value=T.status||'concept';
-  el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=T.wisseltijd||5;
+  el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=(T.wisseltijd==null?0:T.wisseltijd);
 }
 async function bewaarGegevens(){
   const oudeStap = step();
@@ -311,7 +311,7 @@ async function bewaarTeams(){ await opslaan('t_melding'); tekenTeams(); }
 /* ---- Schema / planbord ---- */
 const toMin=t=>{const[h,m]=String(t||'10:00').split(':').map(Number);return h*60+(m||0);};
 const toHHMM=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
-function step(){ return (T.wedstrijdduur||20)+(T.wisseltijd||5); }
+function step(){ return (T.wedstrijdduur||20)+(T.wisseltijd==null?0:T.wisseltijd); }
 function slots(){
   const banen=T.banen||[]; if(!banen.length) return [];
   const start=Math.min(...banen.map(b=>toMin(b.starttijd)));
@@ -406,7 +406,7 @@ function tekenBoard(){
   const up=el('unplanned');
   up.innerHTML=open.map(chip).join('')||'<p class="mini">Alles ingepland 🎉</p>';
   up.ondragover=e=>e.preventDefault();
-  up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w){snap();w.baan=null;w.tijd=null;tekenBoard();} };
+  up.ondrop=e=>{ e.preventDefault(); const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(w&&w.baan&&w.tijd){snap();const oud={baan:w.baan,tijd:w.tijd};w.baan=null;w.tijd=null;vulGat(oud);tekenBoard();} };
 
   el('legenda').innerHTML = (T.divisies||[]).map(d=>`<span><b style="background:${divKleur(d.id)}"></b>${esc(d.naam)}</span>`).join('')
     + `<span>· Knock-out = zelfde kleur als het niveau, met de ronde als label</span>`;
@@ -415,8 +415,20 @@ function drop(e,cel){
   e.preventDefault(); cel.classList.remove('over');
   const w=T.wedstrijden.find(x=>x.id===e.dataTransfer.getData('text')); if(!w) return;
   snap();
+  if(w.baan&&w.tijd){ const oud={baan:w.baan,tijd:w.tijd}; w.baan=null; w.tijd=null; vulGat(oud); } // gat achterlaten? rest schuift terug
   schuifIn(w, cel.dataset.baan, cel.dataset.tijd);
   tekenBoard();
+}
+// Trekt de aaneengesloten reeks wedstrijden ná het vrijgekomen vak één plek terug.
+function vulGat(vak){
+  while(vak){
+    const volgende=volgendeVak(vak.baan,vak.tijd);
+    if(!volgende) return;
+    const bez=T.wedstrijden.find(x=>x.baan===volgende.baan&&x.tijd===volgende.tijd);
+    if(!bez) return; // leeg vak = einde van de reeks
+    bez.baan=vak.baan; bez.tijd=vak.tijd;
+    vak=volgende;
+  }
 }
 // Volgende bespeelbare vak in leesvolgorde: rechts op dezelfde regel, daarna de volgende tijdregel.
 function volgendeVak(baanId,tijd){

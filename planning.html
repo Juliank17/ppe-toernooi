@@ -83,7 +83,7 @@ async function laad(){
 function slots(){
   const banen = DATA.banen||[];
   if(!banen.length) return [];
-  const step = (DATA.wedstrijdduur||20)+(DATA.wisseltijd||5);
+  const step = (DATA.wedstrijdduur||20)+(DATA.wisseltijd==null?0:DATA.wisseltijd);
   const start = Math.min(...banen.map(b=>toMin(b.starttijd)));
   const n = Math.max(8, Math.ceil((DATA.wedstrijden||[]).length/banen.length)+3);
   return Array.from({length:n},(_,i)=>toHHMM(start+i*step));

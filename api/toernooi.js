@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
           personeelspin: body.personeelspin || '',
           banen: [],
           wedstrijdduur: 20,
-          wisseltijd: 5,
+          wisseltijd: 0,
           scoreType: 'punten',
           punten: { winst: 3, gelijk: 1, verlies: 0 },
           tiebreakers: ['punten', 'onderling', 'saldo', 'voor', 'gewonnen'],

@@ -94,7 +94,7 @@
       <h2>5. Wedstrijdinstellingen</h2>
       <div class="rij">
         <div><label>Wedstrijdduur (min)</label><input id="w_duur" type="number" min="5" value="20"></div>
-        <div><label>Wisseltijd (min)</label><input id="w_wissel" type="number" min="0" value="5"></div>
+        <div><label>Wisseltijd (min)</label><input id="w_wissel" type="number" min="0" value="0"></div>
       </div>
       <div class="rij">
         <div><label>Punten winst</label><input id="p_winst" type="number" value="3"></div>
@@ -304,7 +304,7 @@ function bouwToernooi(){
     status:'concept',
     banen: leesBanen(),
     wedstrijdduur: +el('w_duur').value||20,
-    wisseltijd: +el('w_wissel').value||5,
+    wisseltijd: Math.max(0,+el('w_wissel').value||0),
     scoreType:'punten',
     punten:{ winst:+el('p_winst').value, gelijk:+el('p_gelijk').value, verlies:+el('p_verlies').value },
     tiebreakers: el('w_tb').value.split(',').map(s=>s.trim()).filter(Boolean),
