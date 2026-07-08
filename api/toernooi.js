@@ -48,6 +48,15 @@ module.exports = async (req, res) => {
       );
 
       if (!t.slug) return json(res, 400, { fout: 'slug is verplicht' });
+
+      // Nieuw toernooi zonder eigen sponsorlijst? Neem de standaard sponsoren over.
+      if (!bestaat && !Array.isArray(body.sponsoren)) {
+        try {
+          const inst = await store.haalInstellingen();
+          if (Array.isArray(inst.sponsoren) && inst.sponsoren.length) t.sponsoren = inst.sponsoren;
+        } catch (e) { /* geen instellingen — geen probleem */ }
+      }
+
       await store.bewaarToernooi(t);
       return json(res, 200, { ok: true, id: t.id, slug: t.slug });
     }

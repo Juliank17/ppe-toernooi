@@ -77,6 +77,7 @@
         <p class="mini" style="color:#5b6b82">Zichtbaar voor spelers op de live-pagina ("Mede mogelijk gemaakt door"). Upload een logo (wordt automatisch verkleind) of laat het leeg — dan tonen we de naam.</p>
         <div id="sponsorlijst"></div>
         <button class="btn sec" onclick="voegSponsor()">+ Sponsor</button>
+        <button class="btn sec" onclick="laadStandaardSponsoren()" title="Voegt de standaardsponsoren (adminpagina) toe die hier nog missen">Standaardlijst bijladen</button>
         <button class="btn" onclick="bewaarSponsoren()">Sponsoren opslaan</button>
         <span id="sp_melding"></span>
       </div>
@@ -216,6 +217,20 @@ function tekenSponsoren(){
     </div>`).join('') || '<p class="mini">Nog geen sponsoren.</p>';
 }
 function voegSponsor(){ T.sponsoren=T.sponsoren||[]; T.sponsoren.push({naam:''}); tekenSponsoren(); }
+// Voegt de standaardsponsoren (van de adminpagina) toe die hier nog niet in staan
+async function laadStandaardSponsoren(){
+  const r=await fetch('/api/instellingen',{headers:hdr()});
+  if(!r.ok){ mgd('sp_melding','Kon de standaardlijst niet laden.',false); return; }
+  const std=((await r.json()).sponsoren)||[];
+  if(!std.length){ mgd('sp_melding','Geen standaardsponsoren ingesteld — beheer ze op de adminpagina.',false); return; }
+  T.sponsoren=T.sponsoren||[];
+  let n=0;
+  for(const s of std){
+    if(!T.sponsoren.some(x=>(x.naam||'').toLowerCase()===(s.naam||'').toLowerCase())){ T.sponsoren.push({...s}); n++; }
+  }
+  tekenSponsoren();
+  mgd('sp_melding', n?`${n} standaardsponsor(en) toegevoegd — vergeet niet op te slaan.`:'Alle standaardsponsoren staan er al in.', true);
+}
 function laadLogo(i,input){
   const f=input.files&&input.files[0]; if(!f) return;
   const img=new Image();
@@ -641,8 +656,8 @@ function tekenDelen(){
   const base=location.origin;
   el('delen').innerHTML=`<div class="kaart">
     <h3>Links</h3>
-    <p><strong>Spelers (live):</strong><br><a href="${base}/live/${esc(T.slug)}">${base}/live/${esc(T.slug)}</a></p>
-    <p><strong>Personeel:</strong><br><a href="${base}/staff/${esc(T.slug)}">${base}/staff/${esc(T.slug)}</a></p>
+    <p><strong>Spelers (live):</strong><br><a href="${base}/live/${esc(T.slug)}" target="_blank" rel="noopener">${base}/live/${esc(T.slug)}</a></p>
+    <p><strong>Personeel:</strong><br><a href="${base}/staff/${esc(T.slug)}" target="_blank" rel="noopener">${base}/staff/${esc(T.slug)}</a></p>
     <p><strong>Personeel-PIN:</strong> ${esc(T.personeelspin||'(nog niet ingesteld)')}</p>
     <p class="mini" style="color:#5b6b82">Deel de spelers-link vrij; de personeel-link + PIN alleen met je medewerkers.</p>
   </div>`;

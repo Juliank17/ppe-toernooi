@@ -47,27 +47,16 @@
     </div>
   </div>
 
-  <!-- Geavanceerd: snel aanmaken zonder wizard -->
+  <!-- Standaard sponsoren -->
   <details class="kaart">
-    <summary>Snel Aanmaken (Zonder Wizard)</summary>
-    <p class="mini">Maakt direct een toernooi met voorbeeldstructuur. Voor een normaal toernooi is de <a href="/nieuw.html">setup-wizard</a> de betere weg.</p>
+    <summary>Standaard Sponsoren</summary>
+    <p class="mini">Deze lijst wordt automatisch overgenomen bij elk níéuw toernooi. Per toernooi kun je daarna sponsoren toevoegen of weghalen (tab Overzicht in het toernooibeheer). Logo's worden automatisch verkleind.</p>
+    <div id="sponsorlijst"></div>
     <div class="rij">
-      <div><label>Naam</label><input id="n_naam"></div>
-      <div><label>Slug (voor de URL)</label><input id="n_slug" placeholder="prime25april"></div>
+      <button class="btn sec" style="flex:0" onclick="voegSP()">+ Sponsor</button>
+      <button class="btn" style="flex:0" onclick="bewaarSP()">Standaardlijst opslaan</button>
     </div>
-    <div class="rij">
-      <div><label>Datum</label><input id="n_datum" type="date"></div>
-      <div><label>Locatie</label><input id="n_locatie"></div>
-      <div><label>Personeel-PIN</label><input id="n_pin"></div>
-    </div>
-    <label>Niveaus</label>
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <label class="schakel"><input type="checkbox" class="nivo" value="Beginner" checked> Beginner</label>
-      <label class="schakel"><input type="checkbox" class="nivo" value="Beginner+" checked> Beginner+</label>
-      <label class="schakel"><input type="checkbox" class="nivo" value="Intermediate" checked> Intermediate</label>
-    </div>
-    <div id="nieuwmelding"></div>
-    <button class="btn" onclick="maakNieuw()">Aanmaken</button>
+    <div id="sp_melding"></div>
   </details>
 
   <!-- Geavanceerd: JSON-editor (noodgereedschap) -->
@@ -96,7 +85,7 @@ function hdr(){ return {'Content-Type':'application/json','x-internal-key':getKe
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function melding(id,t,ok){ document.getElementById(id).innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${esc(t)}</div>`:''; }
 
-function bewaarKey(){ localStorage.setItem('ppe_key',document.getElementById('key').value); document.getElementById('keymelding').textContent='Opgeslagen in deze browser.'; laadOverzicht(); }
+function bewaarKey(){ localStorage.setItem('ppe_key',document.getElementById('key').value); document.getElementById('keymelding').textContent='Opgeslagen in deze browser.'; laadOverzicht(); laadInstellingen(); }
 document.getElementById('key').value = getKey();
 if(!getKey()) document.getElementById('sleutelkaart').open = true; // zonder sleutel: meteen tonen
 
@@ -122,10 +111,10 @@ function renderOverzicht(){
     const gearch = t.status === 'gearchiveerd';
     return `
       <div class="wed"><div>
-        <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" style="text-decoration:none">${esc(t.naam)} →</a>
+        <div class="teams"><a href="/beheer.html?id=${encodeURIComponent(t.id)}" target="_blank" rel="noopener" style="text-decoration:none">${esc(t.naam)} →</a>
           <span class="badge s-${esc(t.status||'concept')}">${esc(t.status||'concept')}</span></div>
         <div class="meta">${esc(t.datum)}${t.locatie?' · '+esc(t.locatie):''}</div></div>
-        <div class="acties"><a class="pil" href="/beheer.html?id=${encodeURIComponent(t.id)}">Beheren</a><a class="pil" href="/live.html?slug=${encodeURIComponent(t.slug)}">Live</a><a class="pil" href="/staff.html?slug=${encodeURIComponent(t.slug)}">Personeel</a>${gearch
+        <div class="acties"><a class="pil" href="/beheer.html?id=${encodeURIComponent(t.id)}" target="_blank" rel="noopener">Beheren</a><a class="pil" href="/live.html?slug=${encodeURIComponent(t.slug)}" target="_blank" rel="noopener">Live</a><a class="pil" href="/staff.html?slug=${encodeURIComponent(t.slug)}" target="_blank" rel="noopener">Personeel</a>${gearch
                ? `<a class="pil" onclick="zetStatus('${esc(t.id)}','concept')">Herstel</a><a class="pil gevaar" onclick="verwijderDef('${esc(t.id)}')">Verwijder</a>`
                : `<a class="pil" onclick="zetStatus('${esc(t.id)}','gearchiveerd')">Archiveer</a>`}</div></div>`;
   }).join('') || 'Nog geen toernooien.';
@@ -152,44 +141,6 @@ async function verwijderDef(id){
   laadOverzicht();
 }
 
-function voorbeeldStructuur(){
-  const nivos = [...document.querySelectorAll('.nivo:checked')].map(c=>c.value);
-  if(!nivos.length) nivos.push('Hoofdtoernooi');
-  const divisies = nivos.map((naam,i)=>{
-    const id='d'+(i+1);
-    return {
-      id, naam,
-      fases:[
-        {id:id+'_poule',type:'poule',poules:[{id:id+'_pA',naam:'Poule A',teams:[]}]},
-        {id:id+'_ko',type:'bracket',grootte:4,kwalificatie:'beste',doorstroom:[]}
-      ]
-    };
-  });
-  return {
-    banen: [{id:'b1',naam:'Baan 1',type:'indoor',starttijd:'10:00'},{id:'b2',naam:'Baan 2',type:'indoor',starttijd:'10:00'}],
-    wedstrijdduur:20, wisseltijd:0,
-    scoreType:'punten', punten:{winst:3,gelijk:1,verlies:0},
-    tiebreakers:['punten','onderling','saldo','voor','gewonnen'], h2hIteratief:true,
-    teams:[],
-    divisies
-  };
-}
-
-async function maakNieuw(){
-  const body = Object.assign({
-    naam:document.getElementById('n_naam').value,
-    slug:document.getElementById('n_slug').value,
-    datum:document.getElementById('n_datum').value,
-    locatie:document.getElementById('n_locatie').value,
-    personeelspin:document.getElementById('n_pin').value,
-    status:'concept',
-  }, voorbeeldStructuur());
-  const r = await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(body)});
-  const j = await r.json();
-  if(r.ok){ melding('nieuwmelding','Aangemaakt — id '+j.id,true); document.getElementById('e_id').value=j.id; laadOverzicht(); laadToernooi(); }
-  else melding('nieuwmelding',j.fout||'Mislukt',false);
-}
-
 async function laadToernooi(){
   const id = document.getElementById('e_id').value;
   const r = await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
@@ -197,8 +148,8 @@ async function laadToernooi(){
   const t = await r.json();
   document.getElementById('e_json').value = JSON.stringify(t,null,2);
   document.getElementById('links').innerHTML =
-    `Live: <a href="/live.html?slug=${encodeURIComponent(t.slug)}">/live/${esc(t.slug)}</a> · `+
-    `Personeel: <a href="/staff.html?slug=${encodeURIComponent(t.slug)}">/staff/${esc(t.slug)}</a>`;
+    `Live: <a href="/live.html?slug=${encodeURIComponent(t.slug)}" target="_blank" rel="noopener">/live/${esc(t.slug)}</a> · `+
+    `Personeel: <a href="/staff.html?slug=${encodeURIComponent(t.slug)}" target="_blank" rel="noopener">/staff/${esc(t.slug)}</a>`;
   melding('editmelding','',true);
 }
 
@@ -224,7 +175,62 @@ async function genereer(){
   else melding('editmelding',j.fout||'Mislukt',false);
 }
 
+/* ---- Standaard sponsoren (voor elk nieuw toernooi) ---- */
+let SP = [];
+
+async function laadInstellingen(){
+  try{
+    const r = await fetch('/api/instellingen',{headers:hdr()});
+    if(!r.ok) return;
+    SP = (await r.json()).sponsoren || [];
+    tekenSP();
+  }catch(e){ /* stil */ }
+}
+function tekenSP(){
+  document.getElementById('sponsorlijst').innerHTML = SP.map((s,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      ${s.logo
+        ? `<img src="${s.logo}" alt="" style="height:38px;max-width:100px;object-fit:contain;background:#fff;border-radius:6px;padding:3px;flex:0 0 auto">`
+        : `<span class="mini" style="width:100px;text-align:center;flex:0 0 auto">geen logo</span>`}
+      <input type="text" value="${esc(s.naam||'')}" placeholder="Naam sponsor" oninput="SP[${i}].naam=this.value" style="flex:2">
+      <input type="text" value="${esc(s.url||'')}" placeholder="https://… (optioneel)" oninput="SP[${i}].url=this.value" style="flex:2">
+      <button class="btn sec" style="margin:0;padding:8px 10px;flex:0 0 auto" onclick="document.getElementById('sp_file_${i}').click()">${s.logo?'Ander logo…':'Logo…'}</button>
+      <input type="file" id="sp_file_${i}" accept="image/*" style="display:none" onchange="spLogo(${i},this)">
+      ${s.logo?`<button class="btn sec" style="margin:0;padding:8px 10px;flex:0 0 auto" title="Logo verwijderen" onclick="delete SP[${i}].logo;tekenSP()">✕</button>`:''}
+      <button class="pil gevaar" style="flex:0 0 auto;border:0" onclick="SP.splice(${i},1);tekenSP()">×</button>
+    </div>`).join('') || '<p class="mini">Nog geen standaardsponsoren.</p>';
+}
+function voegSP(){ SP.push({naam:''}); tekenSP(); }
+function spLogo(i,input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const img=new Image();
+  img.onload=()=>{
+    const max=300, schaal=Math.min(1, max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*schaal)); c.height=Math.max(1,Math.round(img.height*schaal));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const isPng=/png|gif|svg/i.test(f.type);
+    SP[i].logo=c.toDataURL(isPng?'image/png':'image/jpeg',0.85);
+    URL.revokeObjectURL(img.src);
+    tekenSP();
+  };
+  img.onerror=()=>{ melding('sp_melding','Kon de afbeelding niet lezen.',false); };
+  img.src=URL.createObjectURL(f);
+}
+async function bewaarSP(){
+  SP = SP.filter(s=>(s.naam||'').trim()).map(s=>{
+    const uit={naam:s.naam.trim()};
+    if((s.url||'').trim()) uit.url=s.url.trim();
+    if(s.logo) uit.logo=s.logo;
+    return uit;
+  });
+  tekenSP();
+  const r = await fetch('/api/instellingen',{method:'POST',headers:hdr(),body:JSON.stringify({sponsoren:SP})});
+  melding('sp_melding', r.ok?'Standaardlijst opgeslagen — nieuwe toernooien krijgen deze sponsoren automatisch.':'Opslaan mislukt', r.ok);
+}
+
 laadOverzicht();
+laadInstellingen();
 </script>
 </body>
 </html>
