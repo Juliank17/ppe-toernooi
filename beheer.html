@@ -74,8 +74,9 @@
 
       <div class="kaart">
         <h3>Sponsoren</h3>
-        <p class="mini" style="color:#5b6b82">Zichtbaar voor spelers op de live-pagina ("Mede mogelijk gemaakt door"). Eén sponsor per regel, met eventueel een link: <code>Naam | https://site.nl</code></p>
-        <textarea id="g_sponsoren" rows="4" placeholder="TopSpin Plaza&#10;Padelshop.nl | https://padelshop.nl"></textarea>
+        <p class="mini" style="color:#5b6b82">Zichtbaar voor spelers op de live-pagina ("Mede mogelijk gemaakt door"). Upload een logo (wordt automatisch verkleind) of laat het leeg — dan tonen we de naam.</p>
+        <div id="sponsorlijst"></div>
+        <button class="btn sec" onclick="voegSponsor()">+ Sponsor</button>
         <button class="btn" onclick="bewaarSponsoren()">Sponsoren opslaan</button>
         <span id="sp_melding"></span>
       </div>
@@ -150,6 +151,12 @@ const getKey = () => localStorage.getItem('ppe_key') || '';
 const hdr = () => ({'Content-Type':'application/json','x-internal-key':getKey()});
 const id = new URLSearchParams(location.search).get('id');
 let T = null;
+let OPGESLAGEN = ''; // JSON-snapshot van de laatst opgeslagen staat
+
+// Waarschuw bij het verlaten van de pagina als er niet-opgeslagen wijzigingen zijn (alle tabs)
+window.addEventListener('beforeunload', (e) => {
+  if (T && JSON.stringify(T) !== OPGESLAGEN) { e.preventDefault(); e.returnValue = ''; }
+});
 const PALET = ['#C5E506','#4fc3f7','#ff9f43','#ee5253','#26de81','#fd79a8','#a29bfe','#feca57'];
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -160,13 +167,15 @@ const naam = tid => { const t=(T.teams||[]).find(x=>x.id===tid); return t?t.naam
 const divNaam = did => { const d=(T.divisies||[]).find(x=>x.id===did); return d?d.naam:''; };
 const divKleur = did => { const i=(T.divisies||[]).findIndex(d=>d.id===did); return PALET[(i<0?0:i)%PALET.length]; };
 
-document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
-  ['overzicht','teams','schema','standen','delen'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
-  if(b.dataset.tab==='schema'){ vulBlokVelden(); tekenVulOpties(); tekenBoard(); }
-  if(b.dataset.tab==='standen') laadStanden();
-  if(b.dataset.tab==='delen') tekenDelen();
-});
+function openTab(naam){
+  if(!['overzicht','teams','schema','standen','delen'].includes(naam)) naam='overzicht';
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x.dataset.tab===naam));
+  ['overzicht','teams','schema','standen','delen'].forEach(t=>toon('tab-'+t,t===naam));
+  if(naam==='schema'){ vulBlokVelden(); tekenVulOpties(); tekenBoard(); }
+  if(naam==='standen') laadStanden();
+  if(naam==='delen') tekenDelen();
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 
 async function laad(){
   if(!getKey()){ toon('geenkey',true); return; }
@@ -177,7 +186,10 @@ async function laad(){
   el('titel').textContent = T.naam;
   el('subtitel').textContent = [T.datum, T.locatie].filter(Boolean).join(' · ');
   toon('app',true);
-  vulGegevens(); tekenBanen(); tekenKnockout(); tekenGenereer(); tekenTeams();
+  vulGegevens(); tekenSponsoren(); tekenBanen(); tekenKnockout(); tekenGenereer(); tekenTeams();
+  OPGESLAGEN = JSON.stringify(T);
+  const tabParam = new URLSearchParams(location.search).get('tab');
+  if(tabParam) openTab(tabParam);
 }
 
 /* ---- Overzicht: gegevens ---- */
@@ -185,13 +197,52 @@ function vulGegevens(){
   el('g_naam').value=T.naam||''; el('g_datum').value=T.datum||''; el('g_locatie').value=T.locatie||'';
   el('g_pin').value=T.personeelspin||''; el('g_status').value=T.status||'concept';
   el('g_duur').value=T.wedstrijdduur||20; el('g_wissel').value=(T.wisseltijd==null?0:T.wisseltijd);
-  el('g_sponsoren').value=(T.sponsoren||[]).map(s=>s.url?`${s.naam} | ${s.url}`:s.naam).join('\n');
+}
+
+/* ---- Sponsoren (met logo-upload; logo wordt verkleind opgeslagen in het toernooi) ---- */
+function tekenSponsoren(){
+  T.sponsoren = T.sponsoren||[];
+  el('sponsorlijst').innerHTML = T.sponsoren.map((s,i)=>`
+    <div class="teamrij">
+      ${s.logo
+        ? `<img src="${s.logo}" alt="" style="height:38px;max-width:100px;object-fit:contain;background:#fff;border:1px solid var(--grijs);border-radius:6px;padding:3px">`
+        : `<span class="mini" style="width:100px;text-align:center;flex:0 0 auto">geen logo</span>`}
+      <input type="text" value="${esc(s.naam||'')}" placeholder="Naam sponsor" oninput="T.sponsoren[${i}].naam=this.value">
+      <input type="text" value="${esc(s.url||'')}" placeholder="https://… (optioneel)" oninput="T.sponsoren[${i}].url=this.value">
+      <button class="btn sec" style="margin:0;padding:8px 10px;flex:0 0 auto" onclick="el('sp_file_${i}').click()">${s.logo?'Ander logo…':'Logo…'}</button>
+      <input type="file" id="sp_file_${i}" accept="image/*" style="display:none" onchange="laadLogo(${i},this)">
+      ${s.logo?`<button class="btn sec" style="margin:0;padding:8px 10px;flex:0 0 auto" title="Logo verwijderen" onclick="delete T.sponsoren[${i}].logo;tekenSponsoren()">✕</button>`:''}
+      <button class="weg" onclick="T.sponsoren.splice(${i},1);tekenSponsoren()">×</button>
+    </div>`).join('') || '<p class="mini">Nog geen sponsoren.</p>';
+}
+function voegSponsor(){ T.sponsoren=T.sponsoren||[]; T.sponsoren.push({naam:''}); tekenSponsoren(); }
+function laadLogo(i,input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const img=new Image();
+  img.onload=()=>{
+    const max=300, schaal=Math.min(1, max/Math.max(img.width,img.height)); // max 300px, ruim genoeg voor de live-pagina
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*schaal)); c.height=Math.max(1,Math.round(img.height*schaal));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const isPng=/png|gif|svg/i.test(f.type); // transparantie behouden
+    T.sponsoren[i].logo=c.toDataURL(isPng?'image/png':'image/jpeg',0.85);
+    URL.revokeObjectURL(img.src);
+    tekenSponsoren();
+    mgd('sp_melding','Logo toegevoegd — vergeet niet op te slaan.',true);
+  };
+  img.onerror=()=>{ mgd('sp_melding','Kon de afbeelding niet lezen.',false); };
+  img.src=URL.createObjectURL(f);
 }
 async function bewaarSponsoren(){
-  T.sponsoren = el('g_sponsoren').value.split('\n').map(s=>s.trim()).filter(Boolean).map(l=>{
-    const [naam,url]=l.split('|').map(x=>x.trim());
-    return url?{naam,url}:{naam};
-  });
+  T.sponsoren=(T.sponsoren||[])
+    .filter(s=>(s.naam||'').trim())
+    .map(s=>{
+      const uit={naam:s.naam.trim()};
+      if((s.url||'').trim()) uit.url=s.url.trim();
+      if(s.logo) uit.logo=s.logo;
+      return uit;
+    });
+  tekenSponsoren();
   await opslaan('sp_melding');
 }
 async function bewaarGegevens(){
@@ -525,16 +576,28 @@ function voegBlokkade(){
   const doelen = baan==='__alle' ? (T.banen||[]).map(b=>b.id) : [baan];
   snap();
   T.blokkades = T.blokkades||[];
+  const verplaatst=[]; // wedstrijden die op de geblokkeerde vakken stonden
   for(let i=i1;i<=i2;i++){
     const tijd=ts[i];
     doelen.forEach(bid=>{
       if(!T.blokkades.some(x=>x.baan===bid && x.tijd===tijd)) T.blokkades.push({baan:bid,tijd,label});
-      // zet een eventueel geplande wedstrijd op dat vak terug
-      T.wedstrijden.filter(w=>w.baan===bid&&w.tijd===tijd).forEach(w=>{w.baan=null;w.tijd=null;});
+      T.wedstrijden.filter(w=>w.baan===bid&&w.tijd===tijd).forEach(w=>{
+        verplaatst.push({w, bid, tijd});
+        w.baan=null; w.tijd=null;
+      });
     });
   }
+  // Verdrongen wedstrijden doorschuiven naar het eerstvolgende vrije vak
+  // (de blokkades staan er al, dus die worden automatisch overgeslagen).
+  for(const {w,bid,tijd} of verplaatst){
+    const vv=volgendeVak(bid,tijd);
+    if(vv) schuifIn(w, vv.baan, vv.tijd);
+    // geen plek meer? dan blijft hij bij "Niet gepland" staan
+  }
   el('bl_label').value=''; el('bl_tot').value=''; tekenBoard();
-  mgd('s_melding','Blokkade toegevoegd — vergeet niet op te slaan.',true);
+  mgd('s_melding', verplaatst.length
+    ? `Blokkade toegevoegd — ${verplaatst.length} wedstrijd(en) doorgeschoven. Vergeet niet op te slaan.`
+    : 'Blokkade toegevoegd — vergeet niet op te slaan.', true);
 }
 function verwijderBlokkade(baanId,tijd){
   snap();
@@ -587,14 +650,16 @@ function tekenDelen(){
 
 /* ---- Opslaan (hele toernooi) ---- */
 async function opslaan(meldEl){
-  const r=await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(T)});
+  const body=JSON.stringify(T);
+  const r=await fetch('/api/toernooi',{method:'POST',headers:hdr(),body});
   const j=await r.json();
+  if(r.ok) OPGESLAGEN=body;
   if(meldEl) mgd(meldEl, r.ok?'Opgeslagen.':(j.fout||'Mislukt'), r.ok);
   return r.ok;
 }
 async function herlaad(){
   const r=await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
-  if(r.ok){ T=await r.json(); T.blokkades=T.blokkades||[]; tekenBoard(); tekenTeams(); tekenGenereer(); tekenKnockout(); }
+  if(r.ok){ T=await r.json(); T.blokkades=T.blokkades||[]; OPGESLAGEN=JSON.stringify(T); tekenBoard(); tekenTeams(); tekenGenereer(); tekenKnockout(); }
 }
 
 laad();

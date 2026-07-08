@@ -152,7 +152,9 @@ function teken(){
     ? `<div class="kaart" style="padding:14px 16px;text-align:center">
         <div class="mini" style="letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Mede mogelijk gemaakt door</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-          ${sp.map(s=>{const pil=`<span class="sponsorpil">${esc(s.naam)}</span>`;
+          ${sp.map(s=>{const pil = s.logo
+              ? `<span class="sponsorpil" style="background:#fff;padding:6px 14px" title="${esc(s.naam)}"><img src="${esc(s.logo)}" alt="${esc(s.naam)}" style="height:34px;max-width:130px;object-fit:contain;vertical-align:middle"></span>`
+              : `<span class="sponsorpil">${esc(s.naam)}</span>`;
             return s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener" style="text-decoration:none">${pil}</a>`:pil;}).join('')}
         </div></div>`
     : '';

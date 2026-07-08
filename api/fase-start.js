@@ -38,6 +38,12 @@ module.exports = async (req, res) => {
     const slots = new Array(grootte).fill(null);
     const pouleMatches = pouleFase ? t.wedstrijden.filter((w) => w.fase === pouleFase.id) : [];
 
+    // Vergrendeling: knock-out mag pas starten als álle poulewedstrijden een uitslag hebben
+    const nogOpen = pouleMatches.filter((w) => !(w.score && w.score.thuis != null && w.score.uit != null));
+    if (nogOpen.length) {
+      return json(res, 400, { fout: `Nog ${nogOpen.length} poulewedstrijd(en) zonder uitslag. Vul eerst alle poulescores in.` });
+    }
+
     if (bracketFase.doorstroom && bracketFase.doorstroom.length && bracketFase.kwalificatie !== 'beste') {
       // Expliciete doorstroomregels: "pA#1" → team dat 1e staat in poule A
       for (const regel of bracketFase.doorstroom) {

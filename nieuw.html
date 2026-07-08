@@ -10,11 +10,12 @@
   @media (max-width:760px){ .layout{ grid-template-columns:1fr; } }
   .checklist { position:sticky; top:16px; align-self:start; }
   .checklist ol { list-style:none; margin:0; padding:0; }
-  .checklist li { padding:9px 10px; border-radius:8px; font-size:.85rem; color:var(--grijs-2); cursor:pointer; display:flex; gap:8px; align-items:center; }
-  .checklist li .bol { width:18px; height:18px; border-radius:50%; border:2px solid var(--grijs-2); display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; flex:0 0 auto; }
-  .checklist li.actief { background:var(--navy-2); color:#fff; }
+  .checklist li { padding:9px 10px; border-radius:8px; font-size:.85rem; color:#8593a8; cursor:pointer; display:flex; gap:8px; align-items:center; }
+  .checklist li .bol { width:18px; height:18px; border-radius:50%; border:2px solid #c3ccd8; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; flex:0 0 auto; }
+  .checklist li.klaar { color:var(--navy); font-weight:600; }
   .checklist li.klaar .bol { background:var(--lime); border-color:var(--lime); color:var(--navy); }
-  .checklist li.klaar { color:#fff; }
+  .checklist li.actief { background:var(--navy); color:#fff; font-weight:600; }
+  .checklist li.actief .bol { border-color:#fff; color:#fff; }
   .stap { display:none; }
   .stap.actief { display:block; }
   .navbtns { display:flex; justify-content:space-between; margin-top:14px; }
@@ -54,8 +55,8 @@
         <div><label>Datum</label><input id="b_datum" type="date"></div>
       </div>
       <div class="rij">
-        <div><label>Locatie</label><input id="b_locatie" placeholder="TopSpin Plaza"></div>
-        <div><label>Personeel-PIN</label><input id="b_pin" placeholder="bv. 2468"></div>
+        <div><label>Locatie (verplicht)</label><input id="b_locatie" placeholder="TopSpin Plaza"></div>
+        <div><label>Personeel-PIN (verplicht)</label><input id="b_pin" placeholder="bv. 2468"></div>
       </div>
     </div>
 
@@ -136,6 +137,7 @@
 const STAPPEN = ['Basis','Vorm','Niveaus','Banen','Wedstrijd','Teams','Controle'];
 let stap = 0;
 let divCount = 0;
+const bezocht = new Set();  // welke stappen zijn al bezocht (voor de vinkjes)
 const getKey = () => localStorage.getItem('ppe_key') || '';
 
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -145,13 +147,17 @@ function vorm(){ const r=document.querySelector('input[name=vorm]:checked'); ret
 
 /* ---- Navigatie + checklist ---- */
 function tekenChecklist(){
-  el('checklist').innerHTML = STAPPEN.map((naam,i)=>`
-    <li class="${i===stap?'actief':''} ${stapCompleet(i)?'klaar':''}" onclick="ganaar(${i})">
-      <span class="bol">${stapCompleet(i)?'✓':i+1}</span>${naam}</li>`).join('');
+  el('checklist').innerHTML = STAPPEN.map((naam,i)=>{
+    const klaar = i!==stap && bezocht.has(i) && stapCompleet(i);
+    return `<li class="${i===stap?'actief':''} ${klaar?'klaar':''}" onclick="ganaar(${i})">
+      <span class="bol">${klaar?'✓':i+1}</span>${naam}</li>`;
+  }).join('');
   el('sleutelwaarschuwing').textContent = getKey() ? '' : 'Let op: interne sleutel ontbreekt — stel die eerst in via Beheer.';
 }
 function ganaar(n){
   if(n<0||n>=STAPPEN.length) return;
+  if(n>stap && !stapCompleet(stap)){ alert('Vul eerst de verplichte velden van deze stap in voordat je verder gaat.'); return; }
+  bezocht.add(stap);   // de stap die je verlaat is nu bezocht
   stap=n;
   document.querySelectorAll('.stap').forEach(s=>s.classList.toggle('actief', +s.dataset.stap===stap));
   el('vorige').style.visibility = stap===0?'hidden':'visible';
@@ -164,7 +170,7 @@ function ganaar(n){
 /* ---- Stap-validatie ---- */
 function stapCompleet(i){
   switch(i){
-    case 0: return el('b_naam').value.trim() && el('b_slug').value.trim();
+    case 0: return el('b_naam').value.trim() && el('b_slug').value.trim() && el('b_locatie').value.trim() && el('b_pin').value.trim();
     case 1: return true;
     case 2: return leesDivisies().length>0;
     case 3: return leesBanen().length>0;
@@ -348,9 +354,12 @@ async function aanmakenEnGenereren(){
     }
     melding('genmelding',`Toernooi aangemaakt en ${totaal} poulewedstrijden gegenereerd.`,true);
     el('klaarlinks').innerHTML =
-      `Live: <a href="/live/${encodeURIComponent(t.slug)}">/live/${esc(t.slug)}</a> · `+
-      `Personeel: <a href="/staff/${encodeURIComponent(t.slug)}">/staff/${esc(t.slug)}</a> · `+
-      `<a href="/admin.html">Beheer</a>`;
+      `<a class="btn" style="font-size:1rem" href="/beheer.html?id=${encodeURIComponent(id)}&tab=schema">Ga naar dit toernooi (schema bouwen) →</a>`+
+      `<div class="mini" style="margin-top:8px">Of open direct: `+
+      `<a href="/live/${encodeURIComponent(t.slug)}">live</a> · `+
+      `<a href="/staff/${encodeURIComponent(t.slug)}">personeel</a></div>`;
+    // pijplijn: ga automatisch door naar het planbord van dit toernooi
+    setTimeout(()=>{ location.href='/beheer.html?id='+encodeURIComponent(id)+'&tab=schema'; }, 1500);
   }catch(e){ melding('genmelding','Fout: '+e.message,false); }
   el('genknop').disabled=false;
 }
