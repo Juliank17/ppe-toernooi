@@ -9,6 +9,8 @@
   tr.ik td{ background:#42561a; font-weight:700; }
   .teamkaart{ border-left:6px solid var(--lime); }
   .sponsorpil{ display:inline-block; border:1px solid var(--lime); border-radius:999px; padding:5px 14px; font-weight:700; color:#fff; }
+  .ster{ cursor:pointer; color:#7d8ba0; width:26px; text-align:center; font-size:1.05rem; user-select:none; }
+  .ster.aan{ color:var(--lime); }
 </style>
 </head>
 <body class="donker">
@@ -59,14 +61,16 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function standTabel(p, zoek){
+  const fav = localStorage.getItem(FAV_KEY);
   const rows = p.stand.map(r => `
     <tr class="${r.gelijkstand?'tie':''} ${zoek&&String(r.teamNaam).toLowerCase().includes(zoek)?'ik':''}">
+      <td class="ster ${fav===r.teamNaam?'aan':''}" data-team="${esc(r.teamNaam)}" title="Zet als mijn team">${fav===r.teamNaam?'★':'☆'}</td>
       <td>${r.positie}</td><td>${esc(r.teamNaam)}</td>
       <td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td>
       <td class="uitgebreid">${r.DPV}</td><td class="uitgebreid">${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
       <td class="p">${r.P}</td></tr>`).join('');
-  return `<div class="kaart"><h3>${esc(p.naam)}</h3><div class="tabelwrap"><table>
-    <tr><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th class="uitgebreid">DPV</th><th class="uitgebreid">DPT</th><th>+/-</th><th>P</th></tr>
+  return `<div class="kaart"><h3>${esc(p.naam)}</h3><p class="mini" style="margin:0 0 6px">Tik op de ☆ voor je eigen team — dan zie je voortaan meteen jouw wedstrijden.</p><div class="tabelwrap"><table>
+    <tr><th></th><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th class="uitgebreid">DPV</th><th class="uitgebreid">DPT</th><th>+/-</th><th>P</th></tr>
     ${rows}</table></div></div>`;
 }
 
@@ -89,8 +93,25 @@ function zetFilter(){
 /* ---- Favoriet team (per toernooi onthouden in deze browser) ---- */
 const FAV_KEY='ppe_fav_'+slug;
 let LAATST_TEAM=null, favToegepast=false;
-function maakFavoriet(){ if(LAATST_TEAM){ localStorage.setItem(FAV_KEY,LAATST_TEAM); teken(); } }
+function maakFavoriet(){ if(LAATST_TEAM){ kiesFavoriet(LAATST_TEAM); } }
 function wisFavoriet(){ localStorage.removeItem(FAV_KEY); teken(); }
+function kiesFavoriet(naam){
+  localStorage.setItem(FAV_KEY, naam);
+  fTeam=naam; document.getElementById('f_team').value=naam;
+  const dId=vindTeamDivisie(naam);
+  if(dId){ fNiv=dId; document.getElementById('f_niveau').value=dId; }
+  teken();
+}
+// Ster in de poulestand: één tik = favoriet aan/uit
+document.getElementById('tab-standen').addEventListener('click', e=>{
+  const st=e.target.closest('.ster'); if(!st) return;
+  const naam=st.dataset.team;
+  if(localStorage.getItem(FAV_KEY)===naam){
+    wisFavoriet();
+  } else {
+    kiesFavoriet(naam);
+  }
+});
 
 function render(data){
   DATA=data;

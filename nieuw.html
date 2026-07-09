@@ -358,8 +358,7 @@ async function aanmakenEnGenereren(){
       `<div class="mini" style="margin-top:8px">Of open direct: `+
       `<a href="/live/${encodeURIComponent(t.slug)}">live</a> · `+
       `<a href="/staff/${encodeURIComponent(t.slug)}">personeel</a></div>`;
-    // pijplijn: ga automatisch door naar het planbord van dit toernooi
-    setTimeout(()=>{ location.href='/beheer.html?id='+encodeURIComponent(id)+'&tab=schema'; }, 1500);
+    // Geen automatische doorstuur: de gebruiker klikt zelf op de knop hierboven.
   }catch(e){ melding('genmelding','Fout: '+e.message,false); }
   el('genknop').disabled=false;
 }
