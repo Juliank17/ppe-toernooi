@@ -85,7 +85,34 @@ function zetFilter(){
   fTeam=document.getElementById('f_team').value;
   teken();
 }
-function render(data){ DATA=data; vulFilters(); teken(); }
+
+/* ---- Favoriet team (per toernooi onthouden in deze browser) ---- */
+const FAV_KEY='ppe_fav_'+slug;
+let LAATST_TEAM=null, favToegepast=false;
+function maakFavoriet(){ if(LAATST_TEAM){ localStorage.setItem(FAV_KEY,LAATST_TEAM); teken(); } }
+function wisFavoriet(){ localStorage.removeItem(FAV_KEY); teken(); }
+
+function render(data){
+  DATA=data;
+  vulFilters();
+  // Eerste keer: favoriet team automatisch invullen zodat je meteen je eigen wedstrijden ziet
+  if(!favToegepast){
+    favToegepast=true;
+    const fav=localStorage.getItem(FAV_KEY);
+    if(fav && !fTeam){
+      fTeam=fav; document.getElementById('f_team').value=fav;
+      const divId=vindTeamDivisie(fav); // ook meteen het niveau-filter op jouw divisie
+      if(divId){ fNiv=divId; document.getElementById('f_niveau').value=divId; }
+    }
+  }
+  teken();
+}
+function vindTeamDivisie(naam){
+  const nl=String(naam).toLowerCase();
+  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
+    if(String(r.teamNaam).toLowerCase()===nl) return d.id;
+  return null;
+}
 
 function vulFilters(){
   const sel=document.getElementById('f_niveau');
@@ -103,8 +130,13 @@ function teamBlok(zoek){
   let gev=null;
   for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
     if(!gev && String(r.teamNaam).toLowerCase().includes(zoek)) gev={d,p,r};
-  if(!gev) return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>';
+  if(!gev){
+    LAATST_TEAM=null;
+    return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>';
+  }
   const {d,p,r}=gev;
+  LAATST_TEAM=r.teamNaam;
+  const isFav=localStorage.getItem(FAV_KEY)===r.teamNaam;
   const nl=String(r.teamNaam).toLowerCase();
   const mijn=(DATA.schema||[]).filter(w=>String(w.thuis).toLowerCase()===nl||String(w.uit).toLowerCase()===nl);
   const rows=mijn.map(w=>`
@@ -112,8 +144,11 @@ function teamBlok(zoek){
       <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       <div class="score">${w.score?w.score.thuis+'-'+w.score.uit:'<span class="badge">nog te spelen</span>'}</div></div>`).join('');
   return `<div class="kaart teamkaart">
-    <h3>${esc(r.teamNaam)}</h3>
+    <h3>${isFav?'★ ':''}${esc(r.teamNaam)}</h3>
     <p class="mini">${esc(d.naam)} · ${esc(p.naam)} · positie <b style="color:var(--lime)">${r.positie}</b> van ${p.stand.length} · ${r.P} punten (${r.W} winst, ${r.GL} gelijk, ${r.V} verlies)</p>
+    <p class="mini" style="margin:4px 0 10px">${isFav
+      ? `<span style="color:var(--lime);font-weight:700">★ Jouw team</span> — wordt bij elk bezoek automatisch getoond · <a style="cursor:pointer" onclick="wisFavoriet()">niet meer volgen</a>`
+      : `<a style="cursor:pointer;color:var(--lime);font-weight:700" onclick="maakFavoriet()">☆ Zet als mijn team</a> — dan zie je bij elk bezoek meteen je eigen wedstrijden en poule`}</p>
     ${rows||'<p class="mini">Nog geen wedstrijden ingepland.</p>'}
   </div>`;
 }
