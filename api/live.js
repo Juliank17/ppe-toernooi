@@ -90,6 +90,7 @@ module.exports = async (req, res) => {
         divisie: w.divisie, groep: w.groep, poule: pouleNaamVan(w), label: w.label || null,
         baan: baanNaam(w.baan), tijd: w.tijd,
         thuis: naam(w.thuis), uit: naam(w.uit),
+        thuisId: w.thuis || null, uitId: w.uit || null, // voor eenduidige team-filters (namen kunnen dubbel zijn)
         score: w.score, status: w.status,
       }));
 

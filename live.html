@@ -63,10 +63,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function standTabel(p, zoek){
-  const fav = localStorage.getItem(FAV_KEY);
+  const fav = favId();
   const rows = p.stand.map(r => `
-    <tr class="${r.gelijkstand?'tie':''} ${zoek&&String(r.teamNaam).toLowerCase().includes(zoek)?'ik':''}">
-      <td class="ster ${fav===r.teamNaam?'aan':''}" data-team="${esc(r.teamNaam)}" title="Zet als mijn team">${fav===r.teamNaam?'★':'☆'}</td>
+    <tr class="${r.gelijkstand?'tie':''} ${(fav===r.team)||(zoek&&String(r.teamNaam).toLowerCase().includes(zoek))?'ik':''}">
+      <td class="ster ${fav===r.team?'aan':''}" data-teamid="${esc(r.team)}" title="Zet als mijn team">${fav===r.team?'★':'☆'}</td>
       <td>${r.positie}</td><td>${esc(r.teamNaam)}</td>
       <td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td>
       <td class="uitgebreid">${r.DPV}</td><td class="uitgebreid">${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
@@ -92,27 +92,33 @@ function zetFilter(){
   teken();
 }
 
-/* ---- Favoriet team (per toernooi onthouden in deze browser) ---- */
+/* ---- Favoriet team (op team-id, per toernooi onthouden in deze browser) ---- */
 const FAV_KEY='ppe_fav_'+slug;
-let LAATST_TEAM=null, favToegepast=false;
+let LAATST_TEAM=null, favToegepast=false; // LAATST_TEAM = team-id van het getoonde teamkaartje
+const favId=()=>localStorage.getItem(FAV_KEY);
 function maakFavoriet(){ if(LAATST_TEAM){ kiesFavoriet(LAATST_TEAM); } }
 function wisFavoriet(){ localStorage.removeItem(FAV_KEY); teken(); }
-function kiesFavoriet(naam){
-  localStorage.setItem(FAV_KEY, naam);
-  fTeam=naam; document.getElementById('f_team').value=naam;
-  const dId=vindTeamDivisie(naam);
-  if(dId){ fNiv=dId; document.getElementById('f_niveau').value=dId; }
+function kiesFavoriet(id){
+  localStorage.setItem(FAV_KEY, id);
+  const rij=vindRijOpId(id);
+  if(rij){
+    fTeam=rij.r.teamNaam; document.getElementById('f_team').value=fTeam;
+    fNiv=rij.d.id; document.getElementById('f_niveau').value=fNiv;
+  }
   teken();
+}
+// Vind de standregel (divisie/poule/rij) van een team-id
+function vindRijOpId(id){
+  if(!id) return null;
+  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
+    if(r.team===id) return {d,p,r};
+  return null;
 }
 // Ster bij een team (Teams-tab of poulestand): één tik = favoriet aan/uit
 document.addEventListener('click', e=>{
   const st=e.target.closest('.ster'); if(!st) return;
-  const naam=st.dataset.team;
-  if(localStorage.getItem(FAV_KEY)===naam){
-    wisFavoriet();
-  } else {
-    kiesFavoriet(naam);
-  }
+  const id=st.dataset.teamid;
+  if(favId()===id) wisFavoriet(); else kiesFavoriet(id);
 });
 
 function render(data){
@@ -121,20 +127,13 @@ function render(data){
   // Eerste keer: favoriet team automatisch invullen zodat je meteen je eigen wedstrijden ziet
   if(!favToegepast){
     favToegepast=true;
-    const fav=localStorage.getItem(FAV_KEY);
-    if(fav && !fTeam){
-      fTeam=fav; document.getElementById('f_team').value=fav;
-      const divId=vindTeamDivisie(fav); // ook meteen het niveau-filter op jouw divisie
-      if(divId){ fNiv=divId; document.getElementById('f_niveau').value=divId; }
+    const rij=vindRijOpId(favId());
+    if(rij && !fTeam){
+      fTeam=rij.r.teamNaam; document.getElementById('f_team').value=fTeam;
+      fNiv=rij.d.id; document.getElementById('f_niveau').value=fNiv;
     }
   }
   teken();
-}
-function vindTeamDivisie(naam){
-  const nl=String(naam).toLowerCase();
-  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
-    if(String(r.teamNaam).toLowerCase()===nl) return d.id;
-  return null;
 }
 
 function vulFilters(){
@@ -147,21 +146,24 @@ function vulFilters(){
   document.getElementById('teamlijst').innerHTML=[...namen].sort().map(n=>`<option value="${esc(n)}">`).join('');
 }
 
-// Blok voor het gezochte team: positie in de poule + eigen wedstrijden (uitslagen + programma)
+// Blok voor het gezochte/favoriete team: positie in de poule + eigen wedstrijden
 function teamBlok(zoek){
-  if(!zoek) return '';
+  const favRij=vindRijOpId(favId());
   let gev=null;
-  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
-    if(!gev && String(r.teamNaam).toLowerCase().includes(zoek)) gev={d,p,r};
-  if(!gev){
-    LAATST_TEAM=null;
-    return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>';
+  // Zoektekst gaat vóór, tenzij die gewoon de favoriet zelf is
+  if(zoek && !(favRij && String(favRij.r.teamNaam).toLowerCase().includes(zoek))){
+    for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
+      if(!gev && String(r.teamNaam).toLowerCase().includes(zoek)) gev={d,p,r};
+    if(!gev){ LAATST_TEAM=null; return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>'; }
+  } else if(zoek || favRij){
+    gev=favRij || null;
+    if(!gev && zoek){ LAATST_TEAM=null; return '<div class="kaart"><p class="mini">Geen team gevonden met die naam.</p></div>'; }
   }
+  if(!gev){ LAATST_TEAM=null; return ''; }
   const {d,p,r}=gev;
-  LAATST_TEAM=r.teamNaam;
-  const isFav=localStorage.getItem(FAV_KEY)===r.teamNaam;
-  const nl=String(r.teamNaam).toLowerCase();
-  const mijn=(DATA.schema||[]).filter(w=>String(w.thuis).toLowerCase()===nl||String(w.uit).toLowerCase()===nl);
+  LAATST_TEAM=r.team; // team-id
+  const isFav=favId()===r.team;
+  const mijn=(DATA.schema||[]).filter(w=>w.thuisId===r.team||w.uitId===r.team);
   const rows=mijn.map(w=>`
     <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)}${w.label?' · '+esc(w.label):''}</div>
       <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
@@ -187,10 +189,10 @@ function teken(){
   const divs=(DATA.divisies||[]).filter(d=>fNiv==='alle'||d.id===fNiv);
 
   // Teams-tab: alle teams met een ster erachter (zoekveld bovenaan filtert mee)
-  const fav=localStorage.getItem(FAV_KEY);
+  const fav=favId();
   let alleTeams=[];
   for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
-    alleTeams.push({naam:r.teamNaam, div:d.naam, poule:p.naam});
+    alleTeams.push({id:r.team, naam:r.teamNaam, div:d.naam, poule:p.naam});
   if(zoek) alleTeams=alleTeams.filter(t=>t.naam.toLowerCase().includes(zoek));
   alleTeams.sort((a,b)=>a.naam.localeCompare(b.naam));
   document.getElementById('tab-teams').innerHTML = `<div class="kaart">
@@ -198,9 +200,9 @@ function teken(){
     <p class="mini">Tik op de ster achter jouw team — dan zie je bij elk bezoek meteen je eigen wedstrijden, poule en stand.</p>
     ${alleTeams.map(t=>`
       <div class="wed"><div>
-        <div class="teams">${fav===t.naam?'★ ':''}${esc(t.naam)}</div>
+        <div class="teams">${fav===t.id?'★ ':''}${esc(t.naam)}</div>
         <div class="meta">${esc(t.div)} · ${esc(t.poule)}</div></div>
-        <div class="ster ${fav===t.naam?'aan':''}" data-team="${esc(t.naam)}" style="font-size:1.6rem">${fav===t.naam?'★':'☆'}</div>
+        <div class="ster ${fav===t.id?'aan':''}" data-teamid="${esc(t.id)}" style="font-size:1.6rem">${fav===t.id?'★':'☆'}</div>
       </div>`).join('') || '<p class="mini">Geen teams gevonden.</p>'}
   </div>` + teamBlok(zoek);
 
@@ -213,7 +215,14 @@ function teken(){
   // Schema (met niveau + speeltijd, gefilterd)
   const divNaam = id => { const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
   let sch=(DATA.schema||[]).filter(w=>fNiv==='alle'||w.divisie===fNiv);
-  if(zoek) sch=sch.filter(w=>String(w.thuis).toLowerCase().includes(zoek)||String(w.uit).toLowerCase().includes(zoek));
+  if(zoek){
+    const favRij=vindRijOpId(favId());
+    if(favRij && String(favRij.r.teamNaam).toLowerCase().includes(zoek)){
+      sch=sch.filter(w=>w.thuisId===favRij.r.team||w.uitId===favRij.r.team); // eenduidig op id (namen kunnen dubbel zijn)
+    } else {
+      sch=sch.filter(w=>String(w.thuis).toLowerCase().includes(zoek)||String(w.uit).toLowerCase().includes(zoek));
+    }
+  }
   document.getElementById('tab-schema').innerHTML = sch.length
     ? `<div class="kaart">${sch.map(w => `
         <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</div>
