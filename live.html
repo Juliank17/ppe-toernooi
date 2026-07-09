@@ -30,12 +30,14 @@
   </div>
 
   <div class="tabs">
-    <button data-tab="standen" class="actief">Standen</button>
+    <button data-tab="teams" class="actief">Teams</button>
+    <button data-tab="standen">Standen</button>
     <button data-tab="schema">Schema</button>
     <button data-tab="info">Info</button>
   </div>
 
-  <div id="tab-standen"></div>
+  <div id="tab-teams"></div>
+  <div id="tab-standen" class="verborgen"></div>
   <div id="tab-schema" class="verborgen"></div>
   <div id="tab-info" class="verborgen">
     <div class="kaart"><h2>Toernooi-informatie</h2><p id="infotekst" class="mini"></p></div>
@@ -50,11 +52,11 @@
 const slug = new URLSearchParams(location.search).get('slug')
   || location.pathname.split('/').filter(Boolean).pop();
 
-let actief = 'standen';
+let actief = 'teams';
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   actief = b.dataset.tab;
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('actief', x === b));
-  ['standen','schema','info'].forEach(t =>
+  ['teams','standen','schema','info'].forEach(t =>
     document.getElementById('tab-' + t).classList.toggle('verborgen', t !== actief));
 });
 
@@ -69,7 +71,7 @@ function standTabel(p, zoek){
       <td>${r.G}</td><td>${r.W}</td><td>${r.GL}</td><td>${r.V}</td>
       <td class="uitgebreid">${r.DPV}</td><td class="uitgebreid">${r.DPT}</td><td>${r.saldo>0?'+':''}${r.saldo}</td>
       <td class="p">${r.P}</td></tr>`).join('');
-  return `<div class="kaart"><h3>${esc(p.naam)}</h3><p class="mini" style="margin:0 0 6px">Tik op de ☆ voor je eigen team — dan zie je voortaan meteen jouw wedstrijden.</p><div class="tabelwrap"><table>
+  return `<div class="kaart"><h3>${esc(p.naam)}</h3><div class="tabelwrap"><table>
     <tr><th></th><th>#</th><th>Team</th><th>G</th><th>W</th><th>GL</th><th>V</th><th class="uitgebreid">DPV</th><th class="uitgebreid">DPT</th><th>+/-</th><th>P</th></tr>
     ${rows}</table></div></div>`;
 }
@@ -102,8 +104,8 @@ function kiesFavoriet(naam){
   if(dId){ fNiv=dId; document.getElementById('f_niveau').value=dId; }
   teken();
 }
-// Ster in de poulestand: één tik = favoriet aan/uit
-document.getElementById('tab-standen').addEventListener('click', e=>{
+// Ster bij een team (Teams-tab of poulestand): één tik = favoriet aan/uit
+document.addEventListener('click', e=>{
   const st=e.target.closest('.ster'); if(!st) return;
   const naam=st.dataset.team;
   if(localStorage.getItem(FAV_KEY)===naam){
@@ -183,6 +185,24 @@ function teken(){
 
   const zoek=fTeam.trim().toLowerCase();
   const divs=(DATA.divisies||[]).filter(d=>fNiv==='alle'||d.id===fNiv);
+
+  // Teams-tab: alle teams met een ster erachter (zoekveld bovenaan filtert mee)
+  const fav=localStorage.getItem(FAV_KEY);
+  let alleTeams=[];
+  for(const d of DATA.divisies||[]) for(const p of d.poules||[]) for(const r of p.stand||[])
+    alleTeams.push({naam:r.teamNaam, div:d.naam, poule:p.naam});
+  if(zoek) alleTeams=alleTeams.filter(t=>t.naam.toLowerCase().includes(zoek));
+  alleTeams.sort((a,b)=>a.naam.localeCompare(b.naam));
+  document.getElementById('tab-teams').innerHTML = `<div class="kaart">
+    <h2>Teams</h2>
+    <p class="mini">Tik op de ster achter jouw team — dan zie je bij elk bezoek meteen je eigen wedstrijden, poule en stand.</p>
+    ${alleTeams.map(t=>`
+      <div class="wed"><div>
+        <div class="teams">${fav===t.naam?'★ ':''}${esc(t.naam)}</div>
+        <div class="meta">${esc(t.div)} · ${esc(t.poule)}</div></div>
+        <div class="ster ${fav===t.naam?'aan':''}" data-team="${esc(t.naam)}" style="font-size:1.6rem">${fav===t.naam?'★':'☆'}</div>
+      </div>`).join('') || '<p class="mini">Geen teams gevonden.</p>'}
+  </div>` + teamBlok(zoek);
 
   // Standen (per divisie, gefilterd; gezocht team uitgelicht)
   document.getElementById('tab-standen').innerHTML = teamBlok(zoek) + (divs.map(d => `
