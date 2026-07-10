@@ -26,6 +26,11 @@
   .aanwezig{ background:#eafbe7; }
   .legenda{ display:flex; gap:12px; flex-wrap:wrap; font-size:.72rem; color:#5b6b82; margin-top:8px; }
   .legenda span b{ display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+  .poulegrid{ display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; align-items:flex-start; }
+  .poulebox{ flex:1; min-width:180px; background:#f2f6fb; border:2px dashed #b9c6d8; border-radius:10px; padding:8px; }
+  .poulebox h4{ margin:0 0 6px; font-family:'Anton'; font-size:.9rem; color:var(--navy); font-weight:400; }
+  .poulebox.over{ border-color:var(--lime); background:#f7fce0; }
+  .teamchip{ background:#fff; border:1px solid var(--grijs); border-radius:6px; padding:6px 9px; margin-bottom:4px; font-size:.85rem; cursor:grab; color:var(--navy); }
 </style>
 </head>
 <body>
@@ -339,12 +344,42 @@ function tekenTeams(){
         <input type="text" value="${esc(tm.naam)}" oninput="hernoem('${tm.id}',this.value)">
         <button class="weg" onclick="verwijderTeam('${tm.id}')">×</button>
       </div>`).join('');
+    // Visuele poule-indeling: slepen tussen poules + mix-knop
+    const pf=(d.fases||[]).find(f=>f.type==='poule');
+    if(pf && (pf.poules||[]).length){
+      const chip=tid=>{ const tm=(T.teams||[]).find(x=>x.id===tid);
+        return tm?`<div class="teamchip" draggable="true" ondragstart="event.dataTransfer.setData('text','tm|${tm.id}')">${esc(tm.naam)}</div>`:''; };
+      const inPoule=new Set(pf.poules.flatMap(p=>p.teams||[]));
+      const los=teams.filter(t=>!inPoule.has(t.id));
+      html += `<div style="margin-top:12px">
+        <b>Poule-indeling</b>
+        <button class="btn sec" style="margin:0 0 0 8px;padding:6px 10px;font-size:.72rem" onclick="mixPoules('${d.id}')">🔀 Mix</button>
+        <p class="mini" style="color:#5b6b82;margin:4px 0">Sleep teams tussen de poules, of klik Mix om ze opnieuw te husselen. Al wedstrijden gegenereerd? Genereer daarna opnieuw (tab Overzicht).</p>
+        <div class="poulegrid">
+          ${pf.poules.map(p=>`
+            <div class="poulebox" data-div="${d.id}" data-poule="${p.id}"
+              ondragover="event.preventDefault();this.classList.add('over')"
+              ondragleave="this.classList.remove('over')"
+              ondrop="dropTeam(event,this)">
+              <h4>${esc(p.naam)} <span class="mini">(${(p.teams||[]).length})</span></h4>
+              ${(p.teams||[]).map(chip).join('')||'<p class="mini">sleep hierheen</p>'}
+            </div>`).join('')}
+          ${los.length?`
+            <div class="poulebox" style="border-style:solid" data-div="${d.id}" data-poule="__geen"
+              ondragover="event.preventDefault();this.classList.add('over')"
+              ondragleave="this.classList.remove('over')"
+              ondrop="dropTeam(event,this)">
+              <h4>Niet ingedeeld <span class="mini">(${los.length})</span></h4>
+              ${los.map(t=>chip(t.id)).join('')}
+            </div>`:''}
+        </div></div>`;
+    }
     html += `<button class="btn sec" onclick="voegTeam('${d.id}')">+ Team toevoegen</button>
       <details style="margin-top:10px">
         <summary class="mini" style="cursor:pointer">Teamnamen in één keer plakken</summary>
         <label>Eén naam per regel</label>
         <textarea id="bulk_${d.id}" rows="6" placeholder="Jan & Piet&#10;Kees & Bram&#10;…"></textarea>
-        <p class="mini" style="color:#5b6b82">De namen vervangen in volgorde de bestaande teamnamen van dit niveau; extra namen worden nieuwe teams (verdeeld over de poules).</p>
+        <p class="mini" style="color:#5b6b82">De namen vervangen in volgorde de bestaande teamnamen van dit niveau. Meer namen dan teamplekken? Dan gebeurt er niets en krijg je een melding — er worden nooit ongemerkt teams bijgemaakt.</p>
         <button class="btn sec" onclick="bulkNamen('${d.id}')">Namen toepassen</button>
       </details></div>`;
   }
@@ -364,6 +399,36 @@ function voegTeam(divId){
   voegInKleinstePoule(divId,nid);
   tekenTeams();
 }
+// Team naar een andere poule slepen (alleen binnen het eigen niveau)
+function dropTeam(e,box){
+  e.preventDefault(); box.classList.remove('over');
+  const data=e.dataTransfer.getData('text');
+  if(!data.startsWith('tm|')) return;
+  const teamId=data.slice(3);
+  const divId=box.dataset.div, pouleId=box.dataset.poule;
+  const tm=(T.teams||[]).find(x=>x.id===teamId);
+  if(!tm || tm.divisie!==divId) return; // team hoort bij een ander niveau
+  const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
+  if(!pf) return;
+  pf.poules.forEach(p=>{ p.teams=(p.teams||[]).filter(x=>x!==teamId); });
+  if(pouleId!=='__geen'){
+    const p=pf.poules.find(x=>x.id===pouleId);
+    if(p){ p.teams=p.teams||[]; p.teams.push(teamId); }
+  }
+  tekenTeams();
+  mgd('t_melding','Indeling aangepast — vergeet niet op te slaan (en zo nodig opnieuw te genereren).',true);
+}
+// Alle teams van een niveau opnieuw willekeurig over de poules verdelen
+function mixPoules(divId){
+  const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
+  if(!pf || !(pf.poules||[]).length) return;
+  const ids=(T.teams||[]).filter(t=>t.divisie===divId).map(t=>t.id);
+  for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; } // Fisher-Yates
+  pf.poules.forEach(p=>p.teams=[]);
+  ids.forEach((tid,i)=>pf.poules[i%pf.poules.length].teams.push(tid));
+  tekenTeams();
+  mgd('t_melding','Teams opnieuw gehusseld — vergeet niet op te slaan (en zo nodig opnieuw te genereren).',true);
+}
 function voegInKleinstePoule(divId,teamId){
   const pf=(T.divisies.find(d=>d.id===divId)||{}).fases?.find(f=>f.type==='poule');
   if(!pf||!pf.poules||!pf.poules.length) return;
@@ -375,18 +440,15 @@ function bulkNamen(divId){
   const namen=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!namen.length) return;
   const bestaand=(T.teams||[]).filter(t=>t.divisie===divId);
-  let hernoemd=0, nieuw=0;
-  namen.forEach((n,i)=>{
-    if(i<bestaand.length){ bestaand[i].naam=n; hernoemd++; }
-    else{
-      const nid='tm'+Date.now()+'_'+i;
-      T.teams.push({id:nid,naam:n,divisie:divId,afwezig:true});
-      voegInKleinstePoule(divId,nid);
-      nieuw++;
-    }
-  });
+  // Nooit stilletjes teams bijmaken: dat breekt de poule-opzet en het aantal wedstrijden.
+  if(namen.length>bestaand.length){
+    mgd('t_melding',`Je plakte ${namen.length} namen, maar dit niveau heeft ${bestaand.length} teamplekken. Er is niets aangepast — haal ${namen.length-bestaand.length} naam/namen weg, of voeg eerst bewust plekken toe via "+ Team toevoegen".`,false);
+    return;
+  }
+  namen.forEach((n,i)=>{ bestaand[i].naam=n; });
   tekenTeams();
-  mgd('t_melding',`${hernoemd} namen toegepast${nieuw?`, ${nieuw} nieuwe teams`:''} — vergeet niet op te slaan.`,true);
+  const over=bestaand.length-namen.length;
+  mgd('t_melding',`${namen.length} namen toegepast${over?` — ${over} teamplek(ken) hebben nog hun oude naam`:''} — vergeet niet op te slaan.`,true);
 }
 async function bewaarTeams(){ await opslaan('t_melding'); tekenTeams(); }
 
