@@ -123,6 +123,8 @@
         <div class="rij">
           <button class="btn" style="flex:0" onclick="autoVul()">Automatisch invullen</button>
           <button class="btn sec" style="flex:0" onclick="stapTerug()">↶ Stap terug</button>
+          <button class="btn sec" style="flex:0" onclick="extraRij(1)" title="Maakt het schema langer, bv. om uit te lopen of ruimer te plannen">+ Tijdregel</button>
+          <button class="btn sec" style="flex:0" onclick="extraRij(-1)">− Tijdregel</button>
           <button class="btn sec" style="flex:0" onclick="leegSchema()">Schema leegmaken</button>
           <button class="btn" style="flex:0" onclick="bewaarSchema()">Schema opslaan</button>
           <span id="s_melding"></span>
@@ -461,8 +463,17 @@ function slots(){
   const start=Math.min(...banen.map(b=>toMin(b.starttijd)));
   const eind=banen.map(b=>b.eindtijd?toMin(b.eindtijd):null).filter(x=>x!=null);
   let end = eind.length ? Math.max(...eind) : start + Math.max(8,Math.ceil((T.wedstrijden||[]).length/banen.length)+3)*step();
-  const out=[]; for(let m=start;m<end && out.length<48;m+=step()) out.push(toHHMM(m));
+  end += (T.extraSlots||0)*step(); // handmatig toegevoegde tijdregels (knop "+ Tijdregel")
+  const out=[]; for(let m=start;m<end && out.length<96;m+=step()) out.push(toHHMM(m));
   return out;
+}
+// Extra tijdregels onder het automatische raster bijmaken of weghalen
+function extraRij(delta){
+  T.extraSlots=Math.max(0,(T.extraSlots||0)+delta);
+  vulBlokVelden(); tekenBoard();
+  mgd('s_melding', delta>0
+    ? `Tijdregel toegevoegd (${T.extraSlots} extra) — vergeet niet op te slaan.`
+    : `Tijdregel weggehaald (${T.extraSlots} extra).`, true);
 }
 function baanOpen(b,tijd){ const m=toMin(tijd); return m>=toMin(b.starttijd) && (!b.eindtijd || m<toMin(b.eindtijd)); }
 function blok(baanId,tijd){ return (T.blokkades||[]).find(x=>x.baan===baanId && x.tijd===tijd); }

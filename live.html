@@ -11,6 +11,15 @@
   .sponsorpil{ display:inline-block; border:1px solid var(--lime); border-radius:999px; padding:5px 14px; font-weight:700; color:#fff; }
   .ster{ cursor:pointer; color:#7d8ba0; width:26px; text-align:center; font-size:1.05rem; user-select:none; }
   .ster.aan{ color:var(--lime); }
+  /* Roosterweergave van het schema (zoals het planbord) */
+  .rooster{ border-collapse:collapse; width:100%; table-layout:fixed; min-width:720px; }
+  .rooster th,.rooster td{ border:1px solid #1e3c66; padding:3px; vertical-align:top; }
+  .rooster th{ background:var(--navy-2); color:#fff; font-size:.72rem; padding:6px 4px; }
+  .rooster td.tijd{ background:var(--navy-2); color:var(--lime); font-family:'Anton'; font-size:.8rem; width:52px; text-align:center; border-bottom-color:#1e3c66; }
+  .gchip{ background:#fff; color:var(--navy); border-radius:5px; border-left:4px solid var(--lime); padding:3px 6px; font-size:.72rem; line-height:1.2; margin-bottom:2px; }
+  .gchip small{ display:block; color:#5b6b82; font-size:.58rem; text-transform:uppercase; }
+  .gchip.dim{ opacity:.3; }
+  .gchip.fav{ outline:2px solid var(--lime); }
 </style>
 </head>
 <body class="donker">
@@ -86,6 +95,11 @@ function bracketBlok(d){
 }
 
 let DATA=null, fNiv='alle', fTeam='';
+const PALET = ['#C5E506','#4fc3f7','#ff9f43','#ee5253','#26de81','#fd79a8','#a29bfe','#feca57'];
+const divNaamVan = id => { const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
+const divKleur = id => { const i=(DATA.divisies||[]).findIndex(d=>d.id===id); return PALET[(i<0?0:i)%PALET.length]; };
+let schemaWeergave = localStorage.getItem('ppe_schema_weergave')||'rooster';
+function zetWeergave(w){ schemaWeergave=w; localStorage.setItem('ppe_schema_weergave',w); teken(); }
 function zetFilter(){
   fNiv=document.getElementById('f_niveau').value;
   fTeam=document.getElementById('f_team').value;
@@ -178,6 +192,37 @@ function teamBlok(zoek){
   </div>`;
 }
 
+// Roosterweergave: banen naast elkaar, tijden onder elkaar (zoals het planbord).
+// Toont álle wedstrijden; bij een niveau-filter vervagen de andere niveaus,
+// en het favoriete team krijgt een lime kader.
+function rasterHtml(){
+  const alle=DATA.schema||[];
+  if(!alle.length) return '<div class="kaart">Nog geen wedstrijden ingepland.</div>';
+  const banen=(DATA.banen||[]).filter(b=>alle.some(w=>w.baan===b.naam));
+  const tijden=[...new Set(alle.map(w=>w.tijd))].sort((a,b)=>String(a).localeCompare(String(b)));
+  const favR=vindRijOpId(favId());
+  let h='<div class="kaart" style="overflow-x:auto;padding:10px"><table class="rooster"><tr><th>Tijd</th>'
+    + banen.map(b=>`<th>${esc(b.naam)}</th>`).join('')+'</tr>';
+  for(const t of tijden){
+    h+=`<tr><td class="tijd">${esc(t)}</td>`;
+    for(const b of banen){
+      const ws=alle.filter(w=>w.tijd===t&&w.baan===b.naam);
+      h+='<td>'+ws.map(w=>{
+        const dim = fNiv!=='alle' && w.divisie!==fNiv;
+        const isFav = favR && (w.thuisId===favR.r.team||w.uitId===favR.r.team);
+        return `<div class="gchip ${dim?'dim':''} ${isFav?'fav':''}" style="border-left-color:${divKleur(w.divisie)}">
+          <small>${esc(divNaamVan(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</small>
+          ${isFav?'★ ':''}${esc(w.thuis)} — ${esc(w.uit)}${w.score?` <b>${w.score.thuis}-${w.score.uit}</b>`:''}</div>`;
+      }).join('')+'</td>';
+    }
+    h+='</tr>';
+  }
+  h+='</table>';
+  h+=`<div class="mini" style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap">${(DATA.divisies||[]).map(d=>
+    `<span><b style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${divKleur(d.id)};margin-right:4px;vertical-align:middle"></b>${esc(d.naam)}</span>`).join('')}</div>`;
+  return h+'</div>';
+}
+
 function teken(){
   if(!DATA) return;
   document.getElementById('titel').textContent = DATA.naam;
@@ -212,8 +257,7 @@ function teken(){
     ${d.poules.map(p=>standTabel(p,zoek)).join('')}
     ${bracketBlok(d)}`).join('') || '<div class="kaart">Nog geen standen.</div>');
 
-  // Schema (met niveau + speeltijd, gefilterd)
-  const divNaam = id => { const d=(DATA.divisies||[]).find(x=>x.id===id); return d?d.naam:''; };
+  // Schema: lijst óf rooster (zoals het planbord), met niveau-highlight
   let sch=(DATA.schema||[]).filter(w=>fNiv==='alle'||w.divisie===fNiv);
   if(zoek){
     const favRij=vindRijOpId(favId());
@@ -223,13 +267,19 @@ function teken(){
       sch=sch.filter(w=>String(w.thuis).toLowerCase().includes(zoek)||String(w.uit).toLowerCase().includes(zoek));
     }
   }
-  document.getElementById('tab-schema').innerHTML = sch.length
+  const lijstHtml = sch.length
     ? `<div class="kaart">${sch.map(w => `
-        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaam(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</div>
+        <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaamVan(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</div>
           <div class="teams">${esc(w.thuis)} — ${esc(w.uit)}</div></div>
           <div class="score">${w.score ? w.score.thuis+'-'+w.score.uit : '<span class="badge">nog te spelen</span>'}</div>
         </div>`).join('')}</div>`
     : '<div class="kaart">Geen wedstrijden gevonden.</div>';
+  const toggleHtml = `<div class="kaart" style="padding:10px 16px;display:flex;gap:8px;align-items:center">
+    <button class="btn ${schemaWeergave==='rooster'?'':'sec'}" style="margin:0;padding:8px 14px" onclick="zetWeergave('rooster')">Rooster</button>
+    <button class="btn ${schemaWeergave==='lijst'?'':'sec'}" style="margin:0;padding:8px 14px" onclick="zetWeergave('lijst')">Lijst</button>
+    ${schemaWeergave==='rooster'&&fNiv!=='alle'?`<span class="mini">Jouw niveau licht op; de rest is vervaagd.</span>`:''}
+  </div>`;
+  document.getElementById('tab-schema').innerHTML = toggleHtml + (schemaWeergave==='rooster' ? rasterHtml() : lijstHtml);
 
   // Sponsoren (altijd zichtbaar, onder de tabs)
   const sp=DATA.sponsoren||[];
