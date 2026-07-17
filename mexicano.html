@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPE — Mexicano</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .wedkaart{ background:#fff; color:var(--navy); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .wedkop{ display:flex; justify-content:space-between; align-items:center; font-size:.72rem; text-transform:uppercase; color:#5b6b82; margin-bottom:8px; }
+  .team{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; }
+  .team .namen{ font-weight:700; font-size:.95rem; }
+  .team input{ width:70px; text-align:center; font-size:1.15rem; padding:8px 4px; }
+  .vs{ text-align:center; font-family:'Anton'; color:#8593a8; font-size:.75rem; }
+  .rust{ background:#12294a; color:#cfe08a; border-radius:8px; padding:8px 12px; font-size:.8rem; margin-bottom:10px; }
+  table.stand td.p{ background:var(--lime); color:var(--navy); font-weight:700; text-align:center; }
+  .timer{ font-family:'Anton'; font-size:1.6rem; color:var(--lime); }
+  .top1{ background:#fbfde8; }
+  .sub2{ font-size:.72rem; color:#8593a8; font-weight:400; }
+  .keuze{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .keuze label{ flex:1; min-width:220px; border:2px solid var(--grijs); border-radius:10px; padding:12px; cursor:pointer; color:var(--navy); text-transform:none; margin:0; font-size:.82rem; }
+  .keuze label.gekozen{ border-color:var(--lime); background:#f7fce0; }
+  .keuze input{ display:none; }
+  .keuze b{ display:block; font-family:'Anton'; font-size:1rem; margin-bottom:2px; }
+  .keuze .mini{ display:block; margin-top:4px; color:#5b6b82; }
+  .baanbadge{ background:var(--navy); color:var(--lime); border-radius:5px; padding:1px 7px; font-size:.7rem; font-family:'Anton'; }
+</style>
+</head>
+<body>
+<header class="kop">
+  <div class="logo">PRIME PADEL EVENTS</div>
+  <h1 id="titel">Mexicano</h1>
+  <div class="sub" id="subtitel">Individueel punten — elke ronde opnieuw indelen</div>
+</header>
+
+<div class="wrap">
+
+  <!-- SETUP -->
+  <div id="setup" class="kaart">
+    <h2>Nieuw Mexicano-toernooi</h2>
+    <label>Indeling</label>
+    <div class="keuze" id="moduskeuze">
+      <label class="gekozen"><input type="radio" name="modus" value="ladder" checked>
+        <b>Klimmen &amp; dalen</b>Win je? Eén baan omhoog. Verlies je? Eén baan omlaag. Op je nieuwe baan speel je mét iemand uit de andere richting (winnaar + verliezer).
+        <span class="mini">Baan 1 = hoogste. Vereist precies 4 spelers per baan.</span></label>
+      <label><input type="radio" name="modus" value="punten">
+        <b>Op puntenstand</b>Elke ronde sorteren op punten; per viertal 1+4 tegen 2+3.
+        <span class="mini">Werkt met elk aantal spelers (rest rouleert).</span></label>
+    </div>
+    <label>Spelers (één naam per regel)</label>
+    <textarea id="s_namen" rows="7" placeholder="Jan&#10;Piet&#10;Kees&#10;Bram&#10;..."></textarea>
+    <p class="mini" style="color:#5b6b82">Of laat leeg en vul hieronder alleen een aantal in — dan worden het Speler 1, Speler 2, …</p>
+    <div class="rij">
+      <div><label>Aantal spelers (als je geen namen invult)</label><input id="s_aantal" type="number" min="4" value="8"></div>
+      <div><label>Aantal banen</label><input id="s_banen" type="number" min="1" value="2"></div>
+    </div>
+    <div class="rij">
+      <div><label>Punten per wedstrijd</label><input id="s_punten" type="number" min="4" value="24"></div>
+      <div><label>Speeltijd per wedstrijd (min)</label><input id="s_duur" type="number" min="1" value="12"></div>
+    </div>
+    <div id="setupmelding"></div>
+    <button class="btn" onclick="start()">Start toernooi</button>
+  </div>
+
+  <!-- SPEL -->
+  <div id="spel" class="verborgen">
+    <div class="kaart">
+      <div class="rij" style="align-items:center">
+        <div><h2 style="margin:0" id="rondekop">Ronde 1</h2>
+          <div class="mini" id="rondeinfo"></div></div>
+        <div style="flex:0;text-align:right">
+          <div class="timer" id="timer">--:--</div>
+          <button class="btn sec" style="margin:4px 0 0;padding:6px 10px;font-size:.7rem" onclick="timerToggle()" id="timerknop">Start timer</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="rustblok"></div>
+    <div id="wedstrijden"></div>
+
+    <div class="kaart">
+      <div id="rondemelding"></div>
+      <button class="btn" onclick="rondeAfronden()">Ronde afronden &amp; husselen ➜</button>
+      <button class="btn sec" onclick="ongedaan()">Vorige ronde ongedaan maken</button>
+    </div>
+
+    <div class="kaart">
+      <h3>Stand</h3>
+      <table class="stand">
+        <tr id="standkop"></tr>
+        <tbody id="stand"></tbody>
+      </table>
+      <p class="mini" style="color:#5b6b82">Elke ronde: spelers worden op punten gesorteerd en per viertal ingedeeld — <strong>1 + 4 tegen 2 + 3</strong>.</p>
+    </div>
+
+    <div class="kaart">
+      <button class="btn sec" onclick="resetAlles()">Toernooi wissen &amp; opnieuw beginnen</button>
+    </div>
+  </div>
+</div>
+
+<footer class="vt">Mexicano · Prime Padel Events — werkt op dit apparaat (lokaal opgeslagen)</footer>
+
+<script>
+const KEY='ppe_mexicano';
+let M=null, timerId=null, timerSec=0, timerLoopt=false;
+
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function el(x){ return document.getElementById(x); }
+function toon(x,on){ el(x).classList.toggle('verborgen',!on); }
+function mgd(x,t,ok){ el(x).innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${esc(t)}</div>`:''; }
+function bewaar(){ localStorage.setItem(KEY, JSON.stringify(M)); }
+function laden(){ try{ const r=localStorage.getItem(KEY); return r?JSON.parse(r):null; }catch{ return null; } }
+const speler = id => M.spelers.find(s=>s.id===id);
+const spNaam = id => { const s=speler(id); return s?s.naam:'?'; };
+
+/* Bijhouden wie met/tegen wie speelde — voor zo veel mogelijk verschillende duo's */
+const sleutel = (x,y) => [x,y].sort().join('|');
+const samenAantal = (p,q) => (M.samen[sleutel(p.id,q.id)] || 0);
+const tegenAantal = (p,q) => (M.tegen[sleutel(p.id,q.id)] || 0);
+function uniekePartners(id){
+  return Object.keys(M.samen||{}).filter(k=> M.samen[k]>0 && k.split('|').includes(id)).length;
+}
+function duoTag(x,y){
+  const n = M.samen[sleutel(x,y)] || 0;
+  return n ? `<span class="sub2">🔁 ${n}× eerder samen</span>`
+           : `<span class="sub2" style="color:#2e7d32">✦ nieuw duo</span>`;
+}
+
+/* ---------- Start ---------- */
+function start(){
+  const regels = el('s_namen').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const aantal = Math.max(4, +el('s_aantal').value||8);
+  const namen = regels.length ? regels : Array.from({length:aantal},(_,i)=>'Speler '+(i+1));
+  if(namen.length < 4){ mgd('setupmelding','Je hebt minimaal 4 spelers nodig.',false); return; }
+
+  const modus = (document.querySelector('input[name=modus]:checked')||{}).value || 'ladder';
+  const banen = Math.max(1,+el('s_banen').value||2);
+  if(modus==='ladder' && namen.length !== banen*4){
+    mgd('setupmelding',`Klimmen & dalen heeft precies 4 spelers per baan nodig: ${banen} banen = ${banen*4} spelers. Je hebt er nu ${namen.length}. Pas het aantal banen of spelers aan, of kies "Op puntenstand".`,false);
+    return;
+  }
+
+  M = {
+    modus,
+    spelers: namen.map((n,i)=>({id:'p'+i, naam:n, punten:0, gespeeld:0, rust:0, baan:0, vanBaan:0})),
+    banen,
+    puntenPer: Math.max(4,+el('s_punten').value||24),
+    duur: Math.max(1,+el('s_duur').value||12),
+    ronde: 1,
+    wedstrijden: [],
+    rusters: [],
+    samen: {},   // hoe vaak speelden twee spelers sámen
+    tegen: {},   // hoe vaak speelden ze tégen elkaar
+    vorige: null,
+  };
+  maakRonde(true);
+  bewaar(); teken();
+}
+
+/* ---------- Ronde-indeling (het "husselen") ---------- */
+/* ===== Klimmen & dalen: baan 1 = hoogste. Winnaars omhoog, verliezers omlaag.
+   Op je nieuwe baan word je gekoppeld aan iemand die uit de ándere richting komt. ===== */
+function verwerkLadder(){
+  for(const w of M.wedstrijden){
+    const aWint = +w.scoreA > +w.scoreB;
+    const winnaars = aWint ? w.teamA : w.teamB;
+    const verliezers = aWint ? w.teamB : w.teamA;
+    winnaars.forEach(id=>{ const s=speler(id); s.vanBaan=w.baan; s.baan=Math.max(1, w.baan-1); });
+    verliezers.forEach(id=>{ const s=speler(id); s.vanBaan=w.baan; s.baan=Math.min(M.banen, w.baan+1); });
+  }
+}
+function maakRondeLadder(eerste){
+  if(eerste){
+    const lijst = M.spelers.slice().sort(()=>Math.random()-0.5);
+    lijst.forEach((s,i)=>{ s.baan = Math.floor(i/4)+1; s.vanBaan = s.baan; });
+  }
+  const weds=[];
+  for(let b=1; b<=M.banen; b++){
+    const groep = M.spelers.filter(s=>s.baan===b);
+    if(groep.length < 4) continue;
+    const origins = [...new Set(groep.map(s=>s.vanBaan))];
+    let A=null, B=null;
+    if(!eerste && origins.length===2){
+      const g1 = groep.filter(s=>s.vanBaan===origins[0]);
+      const g2 = groep.filter(s=>s.vanBaan===origins[1]);
+      if(g1.length===2 && g2.length===2){
+        // altijd kruisen: iemand van boven met iemand van beneden (winnaar + verliezer)
+        const o1 = { A:[g1[0],g2[0]], B:[g1[1],g2[1]] };
+        const o2 = { A:[g1[0],g2[1]], B:[g1[1],g2[0]] };
+        const kost = o => samenAantal(o.A[0],o.A[1]) + samenAantal(o.B[0],o.B[1]);
+        const kies = kost(o1) <= kost(o2) ? o1 : o2;   // minste herhaalde duo's
+        A=kies.A; B=kies.B;
+      }
+    }
+    if(!A){ const g=groep.slice().sort(()=>Math.random()-0.5); A=[g[0],g[1]]; B=[g[2],g[3]]; }
+    weds.push({ baan:b, golf:1, teamA:[A[0].id,A[1].id], teamB:[B[0].id,B[1].id], scoreA:'', scoreB:'' });
+  }
+  M.wedstrijden = weds;
+  M.rusters = [];
+}
+
+function maakRonde(eerste){
+  if(M.modus==='ladder') return maakRondeLadder(eerste);
+  // Rangschik: ronde 1 = willekeurig, daarna op punten (hoog → laag)
+  let lijst = M.spelers.slice();
+  if(eerste){ lijst.sort(()=>Math.random()-0.5); }
+  else { lijst.sort((a,b)=> b.punten-a.punten || a.rust-b.rust || a.naam.localeCompare(b.naam)); }
+
+  // Wie rust deze ronde? (aantal spelers niet deelbaar door 4)
+  const restAantal = lijst.length % 4;
+  let rusters = [];
+  if(restAantal){
+    // eerlijk: wie het minst gerust heeft rust nu; bij gelijke rust de laagst geplaatste
+    const kandidaten = lijst.slice().sort((a,b)=> a.rust-b.rust || a.punten-b.punten);
+    rusters = kandidaten.slice(0, restAantal).map(s=>s.id);
+    lijst = lijst.filter(s=>!rusters.includes(s.id));
+  }
+
+  // Groepjes van 4 op volgorde. Standaard Mexicano = 1+4 tegen 2+3, maar we kiezen
+  // de indeling waarbij spelers zo min mogelijk mét dezelfde partner spelen.
+  const weds = [];
+  for(let i=0;i<lijst.length;i+=4){
+    const [a,b,c,d] = lijst.slice(i,i+4);
+    const opties = [
+      { A:[a,d], B:[b,c] },   // klassiek Mexicano (1+4 vs 2+3)
+      { A:[a,b], B:[c,d] },
+      { A:[a,c], B:[b,d] },
+    ];
+    let beste=opties[0], besteKost=Infinity;
+    opties.forEach((o,idx)=>{
+      const herhaaldDuo = samenAantal(o.A[0],o.A[1]) + samenAantal(o.B[0],o.B[1]);
+      const herhaaldeTegen = tegenAantal(o.A[0],o.B[0])+tegenAantal(o.A[0],o.B[1])
+                           + tegenAantal(o.A[1],o.B[0])+tegenAantal(o.A[1],o.B[1]);
+      // partners wegen zwaar, tegenstanders licht; bij gelijkspel wint klassiek Mexicano
+      const kost = herhaaldDuo*10 + herhaaldeTegen*1 + (idx===0 ? -0.5 : 0);
+      if(kost < besteKost){ besteKost=kost; beste=o; }
+    });
+    weds.push({
+      baan: (weds.length % M.banen) + 1,
+      golf: Math.floor(weds.length / M.banen) + 1,
+      teamA: [beste.A[0].id, beste.A[1].id],
+      teamB: [beste.B[0].id, beste.B[1].id],
+      scoreA: '', scoreB: '',
+    });
+  }
+  M.wedstrijden = weds;
+  M.rusters = rusters;
+}
+
+/* ---------- Weergave ---------- */
+function teken(){
+  toon('setup', !M); toon('spel', !!M);
+  if(!M) return;
+
+  el('rondekop').textContent = 'Ronde '+M.ronde;
+  const golven = Math.max(...M.wedstrijden.map(w=>w.golf), 1);
+  el('rondeinfo').innerHTML = `${M.wedstrijden.length} wedstrijden · ${M.banen} ${M.banen===1?'baan':'banen'} · tot ${M.puntenPer} punten · ${M.duur} min`
+    + (M.modus==='ladder' ? ` · <strong style="color:var(--lime)">Baan 1 = hoogste — winnaars omhoog, verliezers omlaag</strong>` : '')
+    + (golven>1 ? ` <span style="color:#ff9f43">· ${golven} speelrondes (meer wedstrijden dan banen)</span>` : '');
+
+  el('rustblok').innerHTML = M.rusters.length
+    ? `<div class="rust">⏸ Rust deze ronde: <strong>${M.rusters.map(spNaam).map(esc).join(', ')}</strong></div>` : '';
+
+  el('wedstrijden').innerHTML = M.wedstrijden.map((w,i)=>`
+    <div class="wedkaart">
+      <div class="wedkop"><span>Baan ${w.baan}${golven>1?` · speelronde ${w.golf}`:''}</span><span>tot ${M.puntenPer}</span></div>
+      <div class="team">
+        <span><span class="namen">${esc(spNaam(w.teamA[0]))} &amp; ${esc(spNaam(w.teamA[1]))}</span><br>${duoTag(w.teamA[0],w.teamA[1])}</span>
+        <input type="number" min="0" id="a_${i}" value="${w.scoreA}" oninput="vulAan(${i},'A',this.value)">
+      </div>
+      <div class="vs">— tegen —</div>
+      <div class="team">
+        <span><span class="namen">${esc(spNaam(w.teamB[0]))} &amp; ${esc(spNaam(w.teamB[1]))}</span><br>${duoTag(w.teamB[0],w.teamB[1])}</span>
+        <input type="number" min="0" id="b_${i}" value="${w.scoreB}" oninput="vulAan(${i},'B',this.value)">
+      </div>
+    </div>`).join('');
+
+  const ladder = M.modus==='ladder';
+  el('standkop').innerHTML = `<th>#</th><th>Speler</th>${ladder?'<th>Baan</th>':''}<th>Punten</th><th>Gesp.</th><th>Gem.</th><th>Duo's</th>`;
+  const gesorteerd = M.spelers.slice().sort((a,b)=> b.punten-a.punten || b.gespeeld-a.gespeeld || a.naam.localeCompare(b.naam));
+  el('stand').innerHTML = gesorteerd.map((s,i)=>`
+    <tr class="${i===0?'top1':''}">
+      <td>${i+1}</td>
+      <td>${esc(s.naam)} ${s.rust?`<span class="sub2">(${s.rust}× rust)</span>`:''}</td>
+      ${ladder?`<td><span class="baanbadge">${s.baan}</span></td>`:''}
+      <td class="p">${s.punten}</td>
+      <td>${s.gespeeld}</td>
+      <td>${s.gespeeld?(s.punten/s.gespeeld).toFixed(1):'–'}</td>
+      <td>${uniekePartners(s.id)}</td>
+    </tr>`).join('');
+}
+
+// Automatisch de tegenscore invullen (samen = puntenPer)
+function vulAan(i, kant, val){
+  const w = M.wedstrijden[i];
+  const n = val===''? '' : Math.max(0, +val);
+  if(kant==='A'){ w.scoreA=n; if(n!=='') { w.scoreB = Math.max(0, M.puntenPer-n); el('b_'+i).value=w.scoreB; } }
+  else { w.scoreB=n; if(n!=='') { w.scoreA = Math.max(0, M.puntenPer-n); el('a_'+i).value=w.scoreA; } }
+  bewaar();
+}
+
+/* ---------- Ronde afronden ---------- */
+function rondeAfronden(){
+  const leeg = M.wedstrijden.filter(w=>w.scoreA===''||w.scoreB==='');
+  if(leeg.length){ mgd('rondemelding',`Nog ${leeg.length} wedstrijd(en) zonder uitslag.`,false); return; }
+  if(M.modus==='ladder'){
+    const gelijk = M.wedstrijden.filter(w=> +w.scoreA === +w.scoreB);
+    if(gelijk.length){ mgd('rondemelding','Bij klimmen & dalen kan een wedstrijd niet gelijk eindigen — speel een beslissend punt.',false); return; }
+  }
+
+  // snapshot voor "ongedaan maken"
+  M.vorige = JSON.parse(JSON.stringify({spelers:M.spelers, ronde:M.ronde, wedstrijden:M.wedstrijden,
+                                        rusters:M.rusters, samen:M.samen, tegen:M.tegen}));
+
+  for(const w of M.wedstrijden){
+    w.teamA.forEach(id=>{ const s=speler(id); s.punten += +w.scoreA; s.gespeeld++; });
+    w.teamB.forEach(id=>{ const s=speler(id); s.punten += +w.scoreB; s.gespeeld++; });
+    // duo's en tegenstanders onthouden voor de variatie in volgende rondes
+    const kA=sleutel(w.teamA[0],w.teamA[1]), kB=sleutel(w.teamB[0],w.teamB[1]);
+    M.samen[kA]=(M.samen[kA]||0)+1; M.samen[kB]=(M.samen[kB]||0)+1;
+    for(const x of w.teamA) for(const y of w.teamB){ const k=sleutel(x,y); M.tegen[k]=(M.tegen[k]||0)+1; }
+  }
+  M.rusters.forEach(id=>{ speler(id).rust++; });
+
+  M.ronde++;
+  if(M.modus==='ladder') verwerkLadder();   // winnaars omhoog, verliezers omlaag
+  maakRonde(false);
+  timerStop();
+  mgd('rondemelding','',true);
+  bewaar(); teken();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function ongedaan(){
+  if(!M.vorige){ mgd('rondemelding','Er is geen vorige ronde om terug te draaien.',false); return; }
+  if(!confirm('Vorige ronde ongedaan maken? De punten van die ronde worden teruggedraaid.')) return;
+  M.spelers = M.vorige.spelers; M.ronde = M.vorige.ronde;
+  M.wedstrijden = M.vorige.wedstrijden; M.rusters = M.vorige.rusters;
+  M.samen = M.vorige.samen || {}; M.tegen = M.vorige.tegen || {};
+  M.vorige = null;
+  bewaar(); teken();
+}
+
+function resetAlles(){
+  if(!confirm('Het hele toernooi wissen en opnieuw beginnen?')) return;
+  localStorage.removeItem(KEY); M=null; timerStop(); teken();
+}
+
+/* ---------- Timer ---------- */
+function timerTekst(){ const m=Math.floor(timerSec/60), s=timerSec%60; el('timer').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
+function timerToggle(){
+  if(timerLoopt){ timerStop(); return; }
+  if(timerSec<=0) timerSec = M.duur*60;
+  timerLoopt=true; el('timerknop').textContent='Pauze';
+  timerId=setInterval(()=>{
+    timerSec--; timerTekst();
+    if(timerSec<=0){ timerStop(); alert('Tijd! Rond de wedstrijden af.'); }
+  },1000);
+  timerTekst();
+}
+function timerStop(){ clearInterval(timerId); timerLoopt=false; timerSec=0; el('timerknop').textContent='Start timer'; el('timer').textContent='--:--'; }
+
+/* ---------- Init ---------- */
+document.querySelectorAll('input[name=modus]').forEach(r=>r.onchange=()=>{
+  document.querySelectorAll('#moduskeuze label').forEach(l=>l.classList.toggle('gekozen', l.querySelector('input').checked));
+});
+M = laden();
+if(M){ M.samen = M.samen || {}; M.tegen = M.tegen || {}; M.modus = M.modus || 'punten'; }
+teken();
+</script>
+</body>
+</html>

@@ -257,16 +257,10 @@ function teken(){
     ${d.poules.map(p=>standTabel(p,zoek)).join('')}
     ${bracketBlok(d)}`).join('') || '<div class="kaart">Nog geen standen.</div>');
 
-  // Schema: lijst óf rooster (zoals het planbord), met niveau-highlight
-  let sch=(DATA.schema||[]).filter(w=>fNiv==='alle'||w.divisie===fNiv);
-  if(zoek){
-    const favRij=vindRijOpId(favId());
-    if(favRij && String(favRij.r.teamNaam).toLowerCase().includes(zoek)){
-      sch=sch.filter(w=>w.thuisId===favRij.r.team||w.uitId===favRij.r.team); // eenduidig op id (namen kunnen dubbel zijn)
-    } else {
-      sch=sch.filter(w=>String(w.thuis).toLowerCase().includes(zoek)||String(w.uit).toLowerCase().includes(zoek));
-    }
-  }
+  // Schema: lijst óf rooster (zoals het planbord), alleen gefilterd op niveau.
+  // De teamzoeker werkt bewust níét op het schema — eigen wedstrijden staan
+  // al in het teamkaartje (tab Teams) en het favoriete team licht op in het rooster.
+  const sch=(DATA.schema||[]).filter(w=>fNiv==='alle'||w.divisie===fNiv);
   const lijstHtml = sch.length
     ? `<div class="kaart">${sch.map(w => `
         <div class="wed"><div><div class="meta">⏱ ${esc(w.tijd)} · ${esc(w.baan)} · ${esc(divNaamVan(w.divisie))}${w.label?' · '+esc(w.label):(w.poule?' · '+esc(w.poule):'')}</div>
