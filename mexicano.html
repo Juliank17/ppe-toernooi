@@ -35,6 +35,15 @@
 
 <div class="wrap">
 
+  <!-- PERSONEEL-LOGIN (alleen bij ?slug=...) -->
+  <div id="pinlogin" class="kaart verborgen">
+    <h2>Inloggen met personeelscode</h2>
+    <label>Code (PIN)</label>
+    <input id="pin" type="password" inputmode="numeric" placeholder="••••">
+    <div id="pinmelding"></div>
+    <button class="btn" onclick="pinLogin()">Inloggen</button>
+  </div>
+
   <!-- SETUP -->
   <div id="setup" class="kaart">
     <h2>Nieuw Mexicano-toernooi</h2>
@@ -55,7 +64,12 @@
       <div><label>Aantal banen</label><input id="s_banen" type="number" min="1" value="2"></div>
     </div>
     <div class="rij">
-      <div><label>Punten per wedstrijd</label><input id="s_punten" type="number" min="4" value="24"></div>
+      <div><label>Speelwijze</label>
+        <select id="s_wijze" onchange="document.getElementById('puntveld').style.display=this.value==='punten'?'':'none'">
+          <option value="tijd" selected>Op tijd (score = stand bij eindsignaal)</option>
+          <option value="punten">Tot een vast aantal punten</option>
+        </select></div>
+      <div id="puntveld" style="display:none"><label>Punten per wedstrijd</label><input id="s_punten" type="number" min="4" value="24"></div>
       <div><label>Speeltijd per wedstrijd (min)</label><input id="s_duur" type="number" min="1" value="12"></div>
     </div>
     <div id="setupmelding"></div>
@@ -104,9 +118,13 @@
 <script>
 const KEY='ppe_mexicano';
 let M=null, timerId=null, timerSec=0, timerLoopt=false;
-// Met ?id=<toernooi> draait dit op de server (staat in je toernooienlijst).
-// Zonder id: lokaal in deze browser — handig voor een snel avondje.
-const TID = new URLSearchParams(location.search).get('id');
+// Drie manieren om deze pagina te openen:
+//   ?id=<toernooi>   → admin (interne sleutel), opslaan op de server
+//   ?slug=<slug>     → personeel (PIN-login, zelfde als de andere spelvorm), opslaan op de server
+//   zonder parameter → lokaal in deze browser (snel avondje)
+const PARAMS = new URLSearchParams(location.search);
+const TID = PARAMS.get('id');
+const SLUG = PARAMS.get('slug') || (location.pathname.match(/\/mexicano\/([^/]+)/)||[])[1] || null;
 let TOER = null;
 const getKey = () => localStorage.getItem('ppe_key') || '';
 
@@ -114,12 +132,17 @@ function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&l
 function el(x){ return document.getElementById(x); }
 function toon(x,on){ el(x).classList.toggle('verborgen',!on); }
 function mgd(x,t,ok){ el(x).innerHTML = t?`<div class="melding ${ok?'ok':'fout'}">${esc(t)}</div>`:''; }
+// Automatisch opslaan bij elke wijziging (score, ronde, timer-acties).
 async function bewaar(){
-  if(TID && TOER){
+  if(SLUG){
+    try{ await fetch('/api/mexicano',{method:'POST',
+      headers:{'Content-Type':'application/json','x-internal-key':getKey()},
+      body:JSON.stringify({slug:SLUG, mexicano:M})}); }catch(e){ /* volgende actie probeert opnieuw */ }
+  } else if(TID && TOER){
     TOER.mexicano = M;
     try{ await fetch('/api/toernooi',{method:'POST',
       headers:{'Content-Type':'application/json','x-internal-key':getKey()},
-      body:JSON.stringify(TOER)}); }catch(e){ /* stil: volgende actie probeert opnieuw */ }
+      body:JSON.stringify(TOER)}); }catch(e){ /* volgende actie probeert opnieuw */ }
   } else {
     localStorage.setItem(KEY, JSON.stringify(M));
   }
@@ -157,6 +180,7 @@ function start(){
 
   M = {
     modus,
+    opTijd: (el('s_wijze').value==='tijd'),
     spelers: namen.map((n,i)=>({id:'p'+i, naam:n, punten:0, gespeeld:0, rust:0, baan:0, vanBaan:0})),
     banen,
     puntenPer: Math.max(4,+el('s_punten').value||24),
@@ -269,7 +293,7 @@ function teken(){
 
   el('rondekop').textContent = 'Ronde '+M.ronde;
   const golven = Math.max(...M.wedstrijden.map(w=>w.golf), 1);
-  el('rondeinfo').innerHTML = `${M.wedstrijden.length} wedstrijden · ${M.banen} ${M.banen===1?'baan':'banen'} · tot ${M.puntenPer} punten · ${M.duur} min`
+  el('rondeinfo').innerHTML = `${M.wedstrijden.length} wedstrijden · ${M.banen} ${M.banen===1?'baan':'banen'} · ${M.opTijd?`op tijd (${M.duur} min)`:`tot ${M.puntenPer} punten`}`
     + (M.modus==='ladder' ? ` · <strong style="color:var(--lime)">Baan 1 = hoogste — winnaars omhoog, verliezers omlaag</strong>` : '')
     + (golven>1 ? ` <span style="color:#ff9f43">· ${golven} speelrondes (meer wedstrijden dan banen)</span>` : '');
 
@@ -278,7 +302,7 @@ function teken(){
 
   el('wedstrijden').innerHTML = M.wedstrijden.map((w,i)=>`
     <div class="wedkaart">
-      <div class="wedkop"><span>Baan ${w.baan}${golven>1?` · speelronde ${w.golf}`:''}</span><span>tot ${M.puntenPer}</span></div>
+      <div class="wedkop"><span>Baan ${w.baan}${golven>1?` · speelronde ${w.golf}`:''}</span><span>${M.opTijd?`⏱ ${M.duur} min`:`tot ${M.puntenPer}`}</span></div>
       <div class="team">
         <span><span class="namen">${esc(spNaam(w.teamA[0]))} &amp; ${esc(spNaam(w.teamA[1]))}</span><br>${duoTag(w.teamA[0],w.teamA[1])}</span>
         <input type="number" min="0" id="a_${i}" value="${w.scoreA}" oninput="vulAan(${i},'A',this.value)">
@@ -305,12 +329,13 @@ function teken(){
     </tr>`).join('');
 }
 
-// Automatisch de tegenscore invullen (samen = puntenPer)
+// Score invullen. Bij "tot X punten" vullen we de tegenscore automatisch aan;
+// bij spelen op tijd vul je beide scores gewoon zelf in.
 function vulAan(i, kant, val){
   const w = M.wedstrijden[i];
   const n = val===''? '' : Math.max(0, +val);
-  if(kant==='A'){ w.scoreA=n; if(n!=='') { w.scoreB = Math.max(0, M.puntenPer-n); el('b_'+i).value=w.scoreB; } }
-  else { w.scoreB=n; if(n!=='') { w.scoreA = Math.max(0, M.puntenPer-n); el('a_'+i).value=w.scoreA; } }
+  if(kant==='A'){ w.scoreA=n; if(n!=='' && !M.opTijd) { w.scoreB = Math.max(0, M.puntenPer-n); el('b_'+i).value=w.scoreB; } }
+  else { w.scoreB=n; if(n!=='' && !M.opTijd) { w.scoreA = Math.max(0, M.puntenPer-n); el('a_'+i).value=w.scoreA; } }
   bewaar();
 }
 
@@ -379,7 +404,46 @@ function timerStop(){ clearInterval(timerId); timerLoopt=false; timerSec=0; el('
 document.querySelectorAll('input[name=modus]').forEach(r=>r.onchange=()=>{
   document.querySelectorAll('#moduskeuze label').forEach(l=>l.classList.toggle('gekozen', l.querySelector('input').checked));
 });
+/* Personeel-flow: zelfde als de andere spelvorm (PIN → cookie via /api/staff-login) */
+async function pinLogin(){
+  const r = await fetch('/api/staff-login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slug:SLUG, pin:el('pin').value})});
+  const j = await r.json();
+  if(r.ok){ toon('pinlogin',false); init(); }
+  else mgd('pinmelding', j.fout||'Onjuiste code', false);
+}
+
 async function init(){
+  if(SLUG){
+    try{
+      const r = await fetch('/api/mexicano?slug='+encodeURIComponent(SLUG),
+        {headers:{'x-internal-key':getKey()}});
+      if(r.status===401){ toon('pinlogin',true); toon('setup',false); toon('spel',false); return; }
+      if(!r.ok){ el('titel').textContent='Toernooi niet gevonden'; return; }
+      TOER = await r.json();
+      M = TOER.mexicano || null;
+      el('titel').textContent = TOER.naam || 'Mexicano';
+      el('subtitel').textContent = [TOER.datum, TOER.locatie].filter(Boolean).join(' · ') || 'Individueel punten';
+      if(!M){
+        if(TOER.banen && TOER.banen.length) el('s_banen').value = TOER.banen.length;
+        if(TOER.wedstrijdduur) el('s_duur').value = TOER.wedstrijdduur;
+        if(TOER.mexicanoPunten) el('s_punten').value = TOER.mexicanoPunten;
+        if(TOER.mexicanoOpTijd===false){ el('s_wijze').value='punten'; el('puntveld').style.display=''; }
+        if(TOER.spelers && TOER.spelers.length) el('s_namen').value = TOER.spelers.join('\n');
+      }
+      if(M){ M.samen=M.samen||{}; M.tegen=M.tegen||{}; M.modus=M.modus||'punten'; }
+      teken();
+      // live meekijken: elke 6s verversen zolang je niet aan het typen bent
+      setInterval(async ()=>{
+        if(document.activeElement && document.activeElement.tagName==='INPUT') return;
+        try{
+          const r2 = await fetch('/api/mexicano?slug='+encodeURIComponent(SLUG),{headers:{'x-internal-key':getKey()}});
+          if(r2.ok){ const d=await r2.json(); if(d.mexicano){ M=d.mexicano; teken(); } }
+        }catch(e){}
+      }, 6000);
+      return;
+    }catch(e){ el('titel').textContent='Fout bij laden'; return; }
+  }
   if(TID){
     try{
       const r = await fetch('/api/toernooi?id='+encodeURIComponent(TID),{headers:{'x-internal-key':getKey()}});

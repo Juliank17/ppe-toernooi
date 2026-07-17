@@ -79,7 +79,12 @@
         <textarea id="mx_namen" rows="6" placeholder="Jan&#10;Piet&#10;Kees&#10;Bram"></textarea>
         <div class="rij">
           <div><label>Aantal banen</label><input id="mx_banen" type="number" min="1" value="2"></div>
-          <div><label>Punten per wedstrijd</label><input id="mx_punten" type="number" min="4" value="24"></div>
+          <div><label>Speelwijze</label>
+            <select id="mx_wijze" onchange="document.getElementById('mx_puntveld').style.display=this.value==='punten'?'':'none'">
+              <option value="tijd" selected>Op tijd</option>
+              <option value="punten">Tot vast aantal punten</option>
+            </select></div>
+          <div id="mx_puntveld" style="display:none"><label>Punten per wedstrijd</label><input id="mx_punten" type="number" min="4" value="24"></div>
           <div><label>Speeltijd (min)</label><input id="mx_duur" type="number" min="1" value="12"></div>
         </div>
         <div id="mxmelding"></div>
@@ -224,12 +229,13 @@ async function maakMexicano(){
     banen: Array.from({length:n},(_,i)=>({id:'b'+(i+1), naam:'Baan '+(i+1), type:'indoor', starttijd:'19:00', eindtijd:''})),
     wedstrijdduur: +el('mx_duur').value||12, wisseltijd: 0,
     spelers: namen,
+    mexicanoOpTijd: el('mx_wijze').value==='tijd',
     mexicanoPunten: +el('mx_punten').value||24,
     divisies: [], teams: [], wedstrijden: [],
   };
   const r = await fetch('/api/toernooi',{method:'POST',headers:{'Content-Type':'application/json','x-internal-key':getKey()},body:JSON.stringify(body)});
   const j = await r.json();
-  if(r.ok) location.href = '/mexicano.html?id='+encodeURIComponent(j.id);
+  if(r.ok) location.href = '/mexicano.html?slug='+encodeURIComponent(body.slug);
   else melding('mxmelding', j.fout||'Aanmaken mislukt', false);
 }
 
