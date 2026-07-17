@@ -112,6 +112,9 @@
       <h3>Spelers</h3>
       <p class="mini" style="color:#5b6b82">Namen wijzigen kan altijd — punten en indeling blijven behouden.</p>
       <div id="spelerslijst"></div>
+      <h3 style="margin-top:16px">Banen</h3>
+      <p class="mini" style="color:#5b6b82">Geef elke baan je eigen naam of nummer (bv. "Baan 7"). Bij klimmen &amp; dalen blijft de bovenste rij de hoogste baan.</p>
+      <div id="banenlijst"></div>
     </div>
 
     <div class="kaart" id="linkskaart"></div>
@@ -161,6 +164,15 @@ async function bewaar(){
 function laden(){ try{ const r=localStorage.getItem(KEY); return r?JSON.parse(r):null; }catch{ return null; } }
 const speler = id => M.spelers.find(s=>s.id===id);
 const spNaam = id => { const s=speler(id); return s?s.naam:'?'; };
+// Baan-weergavenamen: intern nummeren we 1..N (nodig voor klimmen & dalen),
+// maar je kunt elke baan een eigen naam/nummer geven (bv. "Baan 7").
+const baanLabel = n => (M.baanNamen && M.baanNamen[n]) || ('Baan '+n);
+function zetBaanNaam(n, val){
+  M.baanNamen = M.baanNamen || {};
+  const v = String(val).trim();
+  if(v) M.baanNamen[n] = v; else delete M.baanNamen[n];
+  bewaar(); teken();
+}
 
 /* Bijhouden wie met/tegen wie speelde — voor zo veel mogelijk verschillende duo's */
 const sleutel = (x,y) => [x,y].sort().join('|');
@@ -203,6 +215,11 @@ function start(){
     tegen: {},   // hoe vaak speelden ze tégen elkaar
     vorige: null,
   };
+  // Baannamen uit het toernooi overnemen (bv. "Baan 7" van de locatie)
+  if(TOER && TOER.banen && TOER.banen.length){
+    M.baanNamen = {};
+    TOER.banen.slice(0, M.banen).forEach((b,i)=>{ if(b.naam) M.baanNamen[i+1]=b.naam; });
+  }
   maakRonde(true);
   bewaar(); teken();
 }
@@ -313,7 +330,7 @@ function teken(){
 
   el('wedstrijden').innerHTML = M.wedstrijden.map((w,i)=>`
     <div class="wedkaart">
-      <div class="wedkop"><span>Baan ${w.baan}${golven>1?` · speelronde ${w.golf}`:''}</span><span>${M.opTijd?`⏱ ${M.duur} min`:`tot ${M.puntenPer}`}</span></div>
+      <div class="wedkop"><span>${esc(baanLabel(w.baan))}${golven>1?` · speelronde ${w.golf}`:''}</span><span>${M.opTijd?`⏱ ${M.duur} min`:`tot ${M.puntenPer}`}</span></div>
       <div class="team">
         <span><span class="namen">${esc(spNaam(w.teamA[0]))} &amp; ${esc(spNaam(w.teamA[1]))}</span><br>${duoTag(w.teamA[0],w.teamA[1])}</span>
         <input type="number" min="0" id="a_${i}" value="${w.scoreA}" oninput="vulAan(${i},'A',this.value)" ${READONLY?'disabled':''}>
@@ -338,6 +355,11 @@ function teken(){
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <input type="text" value="${esc(s.naam)}" onchange="hernoemSpeler('${s.id}',this.value)">
       </div>`).join('');
+    el('banenlijst').innerHTML = Array.from({length:M.banen},(_,i)=>i+1).map(n=>`
+      <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+        <span class="baanbadge" style="flex:0 0 auto">${n}</span>
+        <input type="text" value="${esc(baanLabel(n))}" onchange="zetBaanNaam(${n},this.value)">
+      </div>`).join('');
   }
 
   // Links voor personeel en toeschouwers (alleen bij server-toernooien)
@@ -361,7 +383,7 @@ function teken(){
     <tr class="${i===0?'top1':''}">
       <td>${i+1}</td>
       <td>${esc(s.naam)} ${s.rust?`<span class="sub2">(${s.rust}× rust)</span>`:''}</td>
-      ${ladder?`<td><span class="baanbadge">${s.baan}</span></td>`:''}
+      ${ladder?`<td><span class="baanbadge">${esc(baanLabel(s.baan))}</span></td>`:''}
       <td class="p">${s.punten}</td>
       <td>${s.gespeeld}</td>
       <td>${s.gespeeld?(s.punten/s.gespeeld).toFixed(1):'–'}</td>
