@@ -73,22 +73,11 @@
 
       <!-- Mexicano heeft geen poules/niveaus: eigen korte opzet -->
       <div id="mxpaneel" class="verborgen" style="margin-top:14px;border-top:1px solid var(--grijs);padding-top:14px">
-        <h3>Mexicano-opzet</h3>
-        <p class="mini" style="color:#5b6b82">Mexicano werkt met individuele spelers en rondes die pas ontstaan ná elke uitslag — daarom slaan we de poule-stappen over.</p>
-        <label>Spelers (één naam per regel)</label>
-        <textarea id="mx_namen" rows="6" placeholder="Jan&#10;Piet&#10;Kees&#10;Bram"></textarea>
-        <div class="rij">
-          <div><label>Aantal banen</label><input id="mx_banen" type="number" min="1" value="2"></div>
-          <div><label>Speelwijze</label>
-            <select id="mx_wijze" onchange="document.getElementById('mx_puntveld').style.display=this.value==='punten'?'':'none'">
-              <option value="tijd" selected>Op tijd</option>
-              <option value="punten">Tot vast aantal punten</option>
-            </select></div>
-          <div id="mx_puntveld" style="display:none"><label>Punten per wedstrijd</label><input id="mx_punten" type="number" min="4" value="24"></div>
-          <div><label>Speeltijd (min)</label><input id="mx_duur" type="number" min="1" value="12"></div>
-        </div>
+        <h3>Mexicano</h3>
+        <p class="mini" style="color:#5b6b82">Mexicano heeft geen poules of vaste teams — de andere stappen vervallen.
+        Spelers, banen en speelwijze vul je straks in bij het beheer van het toernooi.</p>
         <div id="mxmelding"></div>
-        <button class="btn" onclick="maakMexicano()">Toernooi aanmaken &amp; Mexicano starten →</button>
+        <button class="btn" onclick="maakMexicano()">Toernooi aanmaken →</button>
       </div>
     </div>
 
@@ -218,19 +207,13 @@ document.querySelectorAll('input[name=vorm]').forEach(r=>r.onchange=()=>{
 async function maakMexicano(){
   if(!getKey()){ melding('mxmelding','Interne sleutel ontbreekt — stel die in via Beheer.',false); return; }
   if(!stapCompleet(0)){ melding('mxmelding','Vul eerst stap 1 in: naam, slug, locatie én personeel-PIN.',false); ganaar(0); return; }
-  const namen = el('mx_namen').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  if(namen.length < 4){ melding('mxmelding','Je hebt minimaal 4 spelers nodig.',false); return; }
-  const n = Math.max(1, +el('mx_banen').value||2);
   const body = {
     naam: el('b_naam').value.trim(), slug: el('b_slug').value.trim(),
     datum: el('b_datum').value, locatie: el('b_locatie').value.trim(),
     personeelspin: el('b_pin').value.trim(), status:'concept',
     vorm:'mexicano',
-    banen: Array.from({length:n},(_,i)=>({id:'b'+(i+1), naam:'Baan '+(i+1), type:'indoor', starttijd:'19:00', eindtijd:''})),
-    wedstrijdduur: +el('mx_duur').value||12, wisseltijd: 0,
-    spelers: namen,
-    mexicanoOpTijd: el('mx_wijze').value==='tijd',
-    mexicanoPunten: +el('mx_punten').value||24,
+    banen: [], wedstrijdduur: 12, wisseltijd: 0,
+    mexicanoOpTijd: true,
     divisies: [], teams: [], wedstrijden: [],
   };
   const r = await fetch('/api/toernooi',{method:'POST',headers:{'Content-Type':'application/json','x-internal-key':getKey()},body:JSON.stringify(body)});
