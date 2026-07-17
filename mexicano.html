@@ -92,9 +92,10 @@
     <div id="rustblok"></div>
     <div id="wedstrijden"></div>
 
-    <div class="kaart">
+    <div class="kaart" id="actieskaart">
       <div id="rondemelding"></div>
       <button class="btn" onclick="rondeAfronden()">Ronde afronden &amp; husselen ➜</button>
+      <button class="btn sec" id="husselknop" onclick="husselOpnieuw()">🔀 Loting opnieuw husselen</button>
       <button class="btn sec" onclick="ongedaan()">Vorige ronde ongedaan maken</button>
     </div>
 
@@ -107,7 +108,15 @@
       <p class="mini" style="color:#5b6b82">Elke ronde: spelers worden op punten gesorteerd en per viertal ingedeeld — <strong>1 + 4 tegen 2 + 3</strong>.</p>
     </div>
 
-    <div class="kaart">
+    <div class="kaart" id="spelerskaart">
+      <h3>Spelers</h3>
+      <p class="mini" style="color:#5b6b82">Namen wijzigen kan altijd — punten en indeling blijven behouden.</p>
+      <div id="spelerslijst"></div>
+    </div>
+
+    <div class="kaart" id="linkskaart"></div>
+
+    <div class="kaart" id="resetkaart">
       <button class="btn sec" onclick="resetAlles()">Toernooi wissen &amp; opnieuw beginnen</button>
     </div>
   </div>
@@ -124,7 +133,9 @@ let M=null, timerId=null, timerSec=0, timerLoopt=false;
 //   zonder parameter → lokaal in deze browser (snel avondje)
 const PARAMS = new URLSearchParams(location.search);
 const TID = PARAMS.get('id');
-const SLUG = PARAMS.get('slug') || (location.pathname.match(/\/mexicano\/([^/]+)/)||[])[1] || null;
+const KIJK = PARAMS.get('kijk') || (location.pathname.match(/\/mexicano-live\/([^/]+)/)||[])[1] || null;
+const SLUG = KIJK ? null : (PARAMS.get('slug') || (location.pathname.match(/\/mexicano\/([^/]+)/)||[])[1] || null);
+const READONLY = !!KIJK;   // toeschouwer: alleen kijken
 let TOER = null;
 const getKey = () => localStorage.getItem('ppe_key') || '';
 
@@ -305,14 +316,43 @@ function teken(){
       <div class="wedkop"><span>Baan ${w.baan}${golven>1?` · speelronde ${w.golf}`:''}</span><span>${M.opTijd?`⏱ ${M.duur} min`:`tot ${M.puntenPer}`}</span></div>
       <div class="team">
         <span><span class="namen">${esc(spNaam(w.teamA[0]))} &amp; ${esc(spNaam(w.teamA[1]))}</span><br>${duoTag(w.teamA[0],w.teamA[1])}</span>
-        <input type="number" min="0" id="a_${i}" value="${w.scoreA}" oninput="vulAan(${i},'A',this.value)">
+        <input type="number" min="0" id="a_${i}" value="${w.scoreA}" oninput="vulAan(${i},'A',this.value)" ${READONLY?'disabled':''}>
       </div>
       <div class="vs">— tegen —</div>
       <div class="team">
         <span><span class="namen">${esc(spNaam(w.teamB[0]))} &amp; ${esc(spNaam(w.teamB[1]))}</span><br>${duoTag(w.teamB[0],w.teamB[1])}</span>
-        <input type="number" min="0" id="b_${i}" value="${w.scoreB}" oninput="vulAan(${i},'B',this.value)">
+        <input type="number" min="0" id="b_${i}" value="${w.scoreB}" oninput="vulAan(${i},'B',this.value)" ${READONLY?'disabled':''}>
       </div>
     </div>`).join('');
+
+  // Kijk-modus (toeschouwers) en beheer-elementen
+  toon('actieskaart', !READONLY);
+  toon('resetkaart', !READONLY);
+  toon('spelerskaart', !READONLY);
+  el('timerknop').style.display = READONLY ? 'none' : '';
+  el('husselknop').style.display = (!READONLY && M.ronde===1) ? '' : 'none';
+
+  // Spelersbeheer: namen wijzigen (punten/indeling blijven staan)
+  if(!READONLY){
+    el('spelerslijst').innerHTML = M.spelers.map(s=>`
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <input type="text" value="${esc(s.naam)}" onchange="hernoemSpeler('${s.id}',this.value)">
+      </div>`).join('');
+  }
+
+  // Links voor personeel en toeschouwers (alleen bij server-toernooien)
+  const dezeSlug = (TOER && TOER.slug) || SLUG;
+  if(!READONLY && dezeSlug){
+    const base = location.origin;
+    el('linkskaart').innerHTML = `<h3>Links delen</h3>
+      <p><strong>Personeel (scores invullen, met PIN):</strong><br>
+        <a href="${base}/mexicano/${encodeURIComponent(dezeSlug)}">${base}/mexicano/${esc(dezeSlug)}</a></p>
+      <p><strong>Toeschouwers (alleen kijken, geen code nodig):</strong><br>
+        <a href="${base}/mexicano-live/${encodeURIComponent(dezeSlug)}">${base}/mexicano-live/${esc(dezeSlug)}</a></p>
+      <p class="mini" style="color:#5b6b82">De kijk-link ververst vanzelf — leuk voor een scherm aan de bar of voor spelers op hun telefoon.</p>`;
+  } else if(!READONLY){
+    el('linkskaart').innerHTML = `<h3>Links delen</h3><p class="mini" style="color:#5b6b82">Dit toernooi draait alleen lokaal in deze browser. Maak het via de wizard aan als toernooi om links voor personeel en toeschouwers te krijgen.</p>`;
+  }
 
   const ladder = M.modus==='ladder';
   el('standkop').innerHTML = `<th>#</th><th>Speler</th>${ladder?'<th>Baan</th>':''}<th>Punten</th><th>Gesp.</th><th>Gem.</th><th>Duo's</th>`;
@@ -337,6 +377,20 @@ function vulAan(i, kant, val){
   if(kant==='A'){ w.scoreA=n; if(n!=='' && !M.opTijd) { w.scoreB = Math.max(0, M.puntenPer-n); el('b_'+i).value=w.scoreB; } }
   else { w.scoreB=n; if(n!=='' && !M.opTijd) { w.scoreA = Math.max(0, M.puntenPer-n); el('a_'+i).value=w.scoreA; } }
   bewaar();
+}
+
+function hernoemSpeler(id, naam){
+  const s = speler(id);
+  if(s && String(naam).trim()){ s.naam = String(naam).trim(); bewaar(); teken(); }
+}
+
+// Alleen in ronde 1: de loting opnieuw doen (nieuwe willekeurige indeling)
+function husselOpnieuw(){
+  const ingevuld = M.wedstrijden.some(w=>w.scoreA!==''||w.scoreB!=='');
+  if(ingevuld && !confirm('Er zijn al scores ingevuld — die worden gewist bij een nieuwe loting. Doorgaan?')) return;
+  maakRonde(true);
+  bewaar(); teken();
+  mgd('rondemelding','Nieuwe loting gemaakt.',true);
 }
 
 /* ---------- Ronde afronden ---------- */
@@ -414,6 +468,23 @@ async function pinLogin(){
 }
 
 async function init(){
+  if(KIJK){
+    // Toeschouwer: alleen-lezen, publiek, ververst vanzelf
+    async function haal(){
+      try{
+        const r = await fetch('/api/mexicano-live?slug='+encodeURIComponent(KIJK));
+        if(!r.ok){ el('titel').textContent='Toernooi niet gevonden'; return; }
+        const d = await r.json();
+        el('titel').textContent = d.naam || 'Mexicano';
+        el('subtitel').textContent = [d.datum, d.locatie].filter(Boolean).join(' · ') || 'Live meekijken';
+        if(d.mexicano){ M=d.mexicano; M.samen=M.samen||{}; M.tegen=M.tegen||{}; teken(); }
+        else { toon('setup',false); toon('spel',false); el('subtitel').textContent='Het toernooi is nog niet gestart.'; }
+      }catch(e){}
+    }
+    await haal();
+    setInterval(haal, 6000);
+    return;
+  }
   if(SLUG){
     try{
       const r = await fetch('/api/mexicano?slug='+encodeURIComponent(SLUG),
