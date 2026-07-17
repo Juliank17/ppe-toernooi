@@ -472,7 +472,7 @@ async function init(){
     // Toeschouwer: alleen-lezen, publiek, ververst vanzelf
     async function haal(){
       try{
-        const r = await fetch('/api/mexicano-live?slug='+encodeURIComponent(KIJK));
+        const r = await fetch('/api/mexicano?publiek=1&slug='+encodeURIComponent(KIJK));
         if(!r.ok){ el('titel').textContent='Toernooi niet gevonden'; return; }
         const d = await r.json();
         el('titel').textContent = d.naam || 'Mexicano';

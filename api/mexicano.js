@@ -1,5 +1,7 @@
-// Mexicano-state lezen/opslaan — voor personeel (PIN-cookie) én admin (interne sleutel).
-// Zelfde toegangsmodel als de andere spelvorm: magSchrijven = admin of geldige staff-cookie.
+// Mexicano-endpoint. Drie smaken in één function (Hobby-plan limiet: max 12 functions):
+//   GET  ?slug=&publiek=1 → alleen-lezen voor toeschouwers (geen code nodig)
+//   GET  ?slug=           → volledige data voor personeel/admin (PIN-cookie of sleutel)
+//   POST {slug, mexicano} → state opslaan (personeel/admin)
 'use strict';
 
 const store = require('../lib/store');
@@ -9,14 +11,24 @@ const { leesBody, json } = require('../lib/http');
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
-      const { slug } = req.query || {};
+      const { slug, publiek } = req.query || {};
       const t = await store.haalToernooiViaSlug(slug);
       if (!t) return json(res, 404, { fout: 'Toernooi niet gevonden' });
+
+      if (publiek) {
+        // Toeschouwers: alleen namen, scores en stand — geen instellingen/PIN
+        return json(res, 200, {
+          naam: t.naam, datum: t.datum, locatie: t.locatie,
+          mexicano: t.mexicano || null,
+        });
+      }
+
       if (!magSchrijven(req, t)) return json(res, 401, { fout: 'Geen toegang' });
       return json(res, 200, {
         naam: t.naam, datum: t.datum, locatie: t.locatie, slug: t.slug,
         banen: t.banen || [], wedstrijdduur: t.wedstrijdduur,
-        mexicanoPunten: t.mexicanoPunten, spelers: t.spelers || [],
+        mexicanoPunten: t.mexicanoPunten, mexicanoOpTijd: t.mexicanoOpTijd,
+        spelers: t.spelers || [],
         mexicano: t.mexicano || null,
       });
     }
