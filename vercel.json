@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/live/:slug", "destination": "/live.html" },
+    { "source": "/tv/:slug", "destination": "/tv.html" },
     { "source": "/staff/:slug", "destination": "/staff.html" },
     { "source": "/mexicano/:slug", "destination": "/mexicano.html" },
     { "source": "/mexicano-live/:slug", "destination": "/mexicano.html" }

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PPE Toernooi — Beheer</title>
 <link rel="stylesheet" href="/assets/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   .terug { color:var(--lime); font-size:.8rem; text-decoration:none; }
   .board { border-collapse:collapse; width:100%; table-layout:fixed; }
@@ -780,9 +781,21 @@ function tekenDelen(){
     <h3>Links</h3>
     <p><strong>Spelers (live):</strong><br><a href="${base}/live/${esc(T.slug)}" target="_blank" rel="noopener">${base}/live/${esc(T.slug)}</a></p>
     <p><strong>Personeel:</strong><br><a href="${base}/staff/${esc(T.slug)}" target="_blank" rel="noopener">${base}/staff/${esc(T.slug)}</a></p>
+    <p><strong>TV-scherm (diavoorstelling):</strong><br><a href="${base}/tv/${esc(T.slug)}" target="_blank" rel="noopener">${base}/tv/${esc(T.slug)}</a>
+      <span class="mini" style="color:#5b6b82">— open dit op een scherm/laptop op locatie en zet 'm fullscreen (F11). Rouleert automatisch langs standen, programma, bracket en sponsors.</span></p>
     <p><strong>Personeel-PIN:</strong> ${esc(T.personeelspin||'(nog niet ingesteld)')}</p>
     <p class="mini" style="color:#5b6b82">Deel de spelers-link vrij; de personeel-link + PIN alleen met je medewerkers.</p>
+  </div>
+  <div class="kaart">
+    <h3>QR-code voor spelers</h3>
+    <p class="mini" style="color:#5b6b82">Print 'm of hang 'm bij de ingang — scannen opent direct de live-pagina. (Rechtermuisknop → afbeelding opslaan.)</p>
+    <div id="qr_spelers" style="background:#fff;padding:12px;border-radius:10px;display:inline-block"></div>
   </div>`;
+  if(window.QRCode){
+    new QRCode(el('qr_spelers'), { text: `${base}/live/${T.slug}`, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+  } else {
+    el('qr_spelers').innerHTML='<p class="mini" style="color:#5b6b82;padding:8px">QR-bibliotheek kon niet laden — link werkt gewoon.</p>';
+  }
 }
 
 /* ---- Backup & herstel ---- */
