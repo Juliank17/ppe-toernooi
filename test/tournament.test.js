@@ -178,4 +178,69 @@ test('byes (null) worden met rust gelaten', () => {
   assert.deepStrictEqual([...slots].filter(Boolean).sort(), ['A1', 'A2', 'B1']);
 });
 
+console.log('\nKnock-out: winnaars doorschuiven');
+
+function maakBracket4(){
+  // Skelet voor 4 teams: 2 halve finales + finale
+  return [
+    { fase:'f', ronde:1, koIndex:0, thuis:'A', uit:'B', score:null, status:'gepland' },
+    { fase:'f', ronde:1, koIndex:1, thuis:'C', uit:'D', score:null, status:'gepland' },
+    { fase:'f', ronde:2, koIndex:0, thuis:null, uit:null, score:null, status:'gepland' },
+  ];
+}
+
+test('winnaars stromen door naar de finale', () => {
+  const ws = maakBracket4();
+  ws[0].score = { thuis: 6, uit: 3 };
+  ws[1].score = { thuis: 2, uit: 6 };
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, 'A');
+  assert.strictEqual(ws[2].uit, 'D');
+});
+
+test('gelijkspel met golden point beslist de winnaar', () => {
+  const ws = maakBracket4();
+  ws[0].score = { thuis: 5, uit: 5, gp: 'uit' };
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, 'B');
+  assert.strictEqual(ws[2].uit, null); // andere helft nog niet gespeeld
+});
+
+test('gelijkspel zónder golden point stroomt niet door', () => {
+  const ws = maakBracket4();
+  ws[0].score = { thuis: 5, uit: 5 };
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, null);
+});
+
+test('correctie: andere winnaar wist de vervolguitslag (cascade)', () => {
+  const ws = maakBracket4();
+  ws[0].score = { thuis: 6, uit: 3 };
+  ws[1].score = { thuis: 6, uit: 1 };
+  T.werkBracketBij(ws, 'f');
+  ws[2].score = { thuis: 6, uit: 4 }; // finale al gespeeld: A wint
+  // Correctie in halve finale 1: B blijkt gewonnen te hebben
+  ws[0].score = { thuis: 3, uit: 6 };
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, 'B');
+  assert.strictEqual(ws[2].score, null, 'finale-uitslag moet gewist zijn');
+});
+
+test('bye (lege kant) stroomt direct door', () => {
+  const ws = maakBracket4();
+  ws[1].uit = null; // C heeft een bye
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].uit, 'C');
+});
+
+test('uitslag wissen trekt de winnaar terug uit de volgende ronde', () => {
+  const ws = maakBracket4();
+  ws[0].score = { thuis: 6, uit: 3 };
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, 'A');
+  ws[0].score = null;
+  T.werkBracketBij(ws, 'f');
+  assert.strictEqual(ws[2].thuis, null);
+});
+
 console.log('\n' + geslaagd + ' tests geslaagd.' + (process.exitCode ? ' (met fouten)' : ''));

@@ -193,8 +193,11 @@ function stapCompleet(i){
 /* ---- Stap 1 ---- */
 function autoSlug(){
   if(el('b_slug').dataset.touched) return;
-  el('b_slug').value = el('b_naam').value.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,24);
+  // Jaartal erin zodat terugkerende toernooien geen slug-botsing geven
+  const jaar = (el('b_datum').value||'').slice(0,4) || String(new Date().getFullYear());
+  el('b_slug').value = (el('b_naam').value.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,20) + jaar).slice(0,28);
 }
+el('b_datum').addEventListener('change', autoSlug);
 el('b_slug').addEventListener('input',()=> el('b_slug').dataset.touched='1');
 document.querySelectorAll('input[name=vorm]').forEach(r=>r.onchange=()=>{
   document.querySelectorAll('#vormkeuze label').forEach(l=>l.classList.toggle('gekozen', l.querySelector('input').checked));

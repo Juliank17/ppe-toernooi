@@ -49,6 +49,12 @@ module.exports = async (req, res) => {
 
       if (!t.slug) return json(res, 400, { fout: 'slug is verplicht' });
 
+      // Slug moet uniek zijn: anders kaapt dit toernooi de live-link van een ander.
+      const bezet = await store.haalToernooiViaSlug(t.slug);
+      if (bezet && bezet.id !== t.id) {
+        return json(res, 400, { fout: `De slug "${t.slug}" is al in gebruik door "${bezet.naam}". Kies een andere — tip: zet het jaartal of de locatie erin (bv. ${t.slug}2026).` });
+      }
+
       // Nieuw toernooi zonder eigen sponsorlijst? Neem de standaard sponsoren over.
       if (!bestaat && !Array.isArray(body.sponsoren)) {
         try {

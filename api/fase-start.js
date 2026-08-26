@@ -5,7 +5,7 @@
 const store = require('../lib/store');
 const { magSchrijven } = require('../lib/auth');
 const { leesBody, json, uid, cfgVan } = require('../lib/http');
-const { teamOpPositie, kwalificatieVolgorde, seedVolgorde, vermijdEigenPoule } = require('../lib/tournament');
+const { teamOpPositie, kwalificatieVolgorde, seedVolgorde, vermijdEigenPoule, werkBracketBij } = require('../lib/tournament');
 
 module.exports = async (req, res) => {
   try {
@@ -94,6 +94,9 @@ module.exports = async (req, res) => {
       }
     }
     bracketFase.gestart = true;
+
+    // Byes (lege plekken in ronde 1) stromen meteen door naar ronde 2
+    werkBracketBij(t.wedstrijden, bracketFase.id);
 
     await store.bewaarToernooi(t);
     return json(res, 200, { ok: true, slots });
