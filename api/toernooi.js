@@ -63,7 +63,17 @@ module.exports = async (req, res) => {
         } catch (e) { /* geen instellingen — geen probleem */ }
       }
 
-      await store.bewaarToernooi(t);
+      try {
+        await store.bewaarToernooi(t);
+      } catch (e) {
+        // Vangnet: record mogelijk te groot door sponsorlogo's — opnieuw zonder logo's
+        if (Array.isArray(t.sponsoren) && t.sponsoren.some((s) => s.logo)) {
+          t.sponsoren = t.sponsoren.map(({ logo, ...rest }) => rest);
+          await store.bewaarToernooi(t);
+        } else {
+          throw e;
+        }
+      }
       return json(res, 200, { ok: true, id: t.id, slug: t.slug });
     }
 

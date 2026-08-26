@@ -205,18 +205,32 @@ function tekenSP(){
 function voegSP(){ SP.push({naam:''}); tekenSP(); }
 function spLogo(i,input){
   const f=input.files&&input.files[0]; if(!f) return;
+  verkleinLogo(f, uit=>{
+    if(!uit){ melding('sp_melding','Logo is te groot of onleesbaar — probeer een kleiner/eenvoudiger bestand.',false); return; }
+    SP[i].logo=uit;
+    tekenSP();
+  });
+}
+// Verkleint een logo agressief (max ~90KB) — grote logo's maakten records te groot voor de database.
+function verkleinLogo(f, cb){
   const img=new Image();
   img.onload=()=>{
-    const max=300, schaal=Math.min(1, max/Math.max(img.width,img.height));
-    const c=document.createElement('canvas');
-    c.width=Math.max(1,Math.round(img.width*schaal)); c.height=Math.max(1,Math.round(img.height*schaal));
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     const isPng=/png|gif|svg/i.test(f.type);
-    SP[i].logo=c.toDataURL(isPng?'image/png':'image/jpeg',0.85);
+    let uit=null;
+    for(const p of [{m:240,png:isPng,q:.8},{m:200,png:false,q:.75},{m:150,png:false,q:.6}]){
+      const schaal=Math.min(1,p.m/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*schaal)); c.height=Math.max(1,Math.round(img.height*schaal));
+      const ctx=c.getContext('2d');
+      if(!p.png){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); }
+      ctx.drawImage(img,0,0,c.width,c.height);
+      uit=c.toDataURL(p.png?'image/png':'image/jpeg',p.q);
+      if(uit.length<=120000) break;
+    }
     URL.revokeObjectURL(img.src);
-    tekenSP();
+    cb(uit && uit.length<=160000 ? uit : null);
   };
-  img.onerror=()=>{ melding('sp_melding','Kon de afbeelding niet lezen.',false); };
+  img.onerror=()=>cb(null);
   img.src=URL.createObjectURL(f);
 }
 async function bewaarSP(){
