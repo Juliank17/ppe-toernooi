@@ -23,6 +23,9 @@ module.exports = async (req, res) => {
     const bracketFase = divisie.fases.find((f) => f.type === 'bracket');
     if (!bracketFase) return json(res, 400, { fout: 'Geen knock-outfase in deze divisie' });
 
+    // Veiligheidssnapshot van de staat vóór deze actie (herstelbaar via beheer)
+    await store._set('backup:' + t.id, { t: Date.now(), actie: (terug ? 'terugdraaien ' : 'knock-out starten ') + divisie.naam, data: t });
+
     // Terugdraaien: knock-out leegmaken maar het skelet (en de planning) behouden
     if (terug) {
       for (const w of t.wedstrijden || []) {

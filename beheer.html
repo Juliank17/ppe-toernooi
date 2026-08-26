@@ -103,6 +103,17 @@
       </div>
 
       <details class="kaart">
+        <summary>Backup &amp; Herstel</summary>
+        <p class="mini" style="color:#5b6b82">Download op de toernooidag af en toe een backup — dan kan er nooit iets écht kwijtraken. Het systeem maakt zelf ook een snapshot vóór elke generatie- of knock-outactie.</p>
+        <div class="rij">
+          <button class="btn" style="flex:0" onclick="downloadBackup()">⬇ Backup downloaden</button>
+          <button class="btn sec" style="flex:0" onclick="herstelSnapshot()">Snapshot terugzetten</button>
+          <span id="b_melding"></span>
+        </div>
+        <p class="mini" style="color:#5b6b82">Terugzetten van een gedownload bestand kan via de JSON-editor op de adminpagina (inhoud plakken → Opslaan).</p>
+      </details>
+
+      <details class="kaart">
         <summary>Logboek — Alle Wijzigingen</summary>
         <p class="mini" style="color:#5b6b82">Elke score-invoer, correctie en fase-actie, nieuwste bovenaan (max. 200 bewaard).</p>
         <div id="logboek" class="mini"></div>
@@ -774,6 +785,28 @@ function tekenDelen(){
   </div>`;
 }
 
+/* ---- Backup & herstel ---- */
+function downloadBackup(){
+  const blob=new Blob([JSON.stringify(T,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const stempel=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.download=`backup-${T.slug||T.id}-${stempel}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  mgd('b_melding','Backup gedownload.',true);
+}
+async function herstelSnapshot(){
+  const r=await fetch('/api/toernooi?id='+encodeURIComponent(id)+'&backup=1',{headers:hdr()});
+  if(!r.ok){ mgd('b_melding','Geen snapshot gevonden (die ontstaat bij genereren of een knock-outactie).',false); return; }
+  const s=await r.json();
+  const wanneer=new Date(s.t).toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  if(!confirm(`Snapshot terugzetten?\n\nGemaakt: ${wanneer}, vlak vóór "${s.actie||'onbekende actie'}".\nDit overschrijft de HUIDIGE stand van dit toernooi (scores van daarna gaan verloren).`)) return;
+  const p=await fetch('/api/toernooi',{method:'POST',headers:hdr(),body:JSON.stringify(s.data)});
+  if(p.ok){ alert('Snapshot teruggezet — de pagina laadt opnieuw.'); location.reload(); }
+  else { const j=await p.json().catch(()=>({})); mgd('b_melding',j.fout||'Terugzetten mislukt.',false); }
+}
+
 /* ---- Logboek ---- */
 function tekenLog(){
   const regels=(T.log||[]).slice(-50).reverse().map(e=>{
@@ -796,12 +829,61 @@ setInterval(()=>{
   s.style.color = vuil ? '#ffe2a8' : '#bff0c7';
 }, 1200);
 
-/* ---- Opslaan (hele toernooi) ---- */
+/* ---- Opslaan (hele toernooi) ----
+   Vóór het opslaan halen we de verse versie op en nemen we alles over wat het
+   personeel intussen deed (scores, check-ins, nieuwe teams, fase-acties, log).
+   Zo kan een beheer-opslag nooit live invoer overschrijven. */
+async function mergeVers(){
+  const r=await fetch('/api/toernooi?id='+encodeURIComponent(id),{headers:hdr()});
+  if(!r.ok) return;
+  const vers=await r.json();
+  const oud = OPGESLAGEN ? JSON.parse(OPGESLAGEN) : null;
+
+  // 1. Scores en status van de server winnen altijd (personeel voert die in);
+  //    bij knock-outwedstrijden ook de (doorgeschoven) teams.
+  const versW=new Map((vers.wedstrijden||[]).map(w=>[w.id,w]));
+  for(const w of (T.wedstrijden||[])){
+    const v=versW.get(w.id); if(!v) continue;
+    w.score=v.score; w.status=v.status;
+    if(w.groep==='ko'){ w.thuis=v.thuis; w.uit=v.uit; }
+  }
+
+  // 2. Check-in: servers waarde overnemen, behalve waar ik hem zelf net wijzigde
+  const oudT=new Map(((oud&&oud.teams)||[]).map(x=>[x.id,x]));
+  const versT=new Map((vers.teams||[]).map(x=>[x.id,x]));
+  for(const tm of (T.teams||[])){
+    const v=versT.get(tm.id), o=oudT.get(tm.id);
+    if(v && o && tm.afwezig===o.afwezig) tm.afwezig=v.afwezig;
+  }
+
+  // 3. Teams die personeel intussen toevoegde (incl. hun poule-plaatsing)
+  for(const v of (vers.teams||[])){
+    if((T.teams||[]).some(x=>x.id===v.id)) continue;
+    T.teams.push(v);
+    for(const d of vers.divisies||[]) for(const f of d.fases||[]) for(const p of (f.poules||[])){
+      if((p.teams||[]).includes(v.id)){
+        const lf=((T.divisies||[]).find(x=>x.id===d.id)?.fases||[]).find(x=>x.id===f.id);
+        const lp=lf&&(lf.poules||[]).find(x=>x.id===p.id);
+        if(lp){ lp.teams=lp.teams||[]; if(!lp.teams.includes(v.id)) lp.teams.push(v.id); }
+      }
+    }
+  }
+
+  // 4. Logboek en fase-status komen van de server
+  if(Array.isArray(vers.log)) T.log=vers.log;
+  for(const d of (T.divisies||[])){
+    const vd=(vers.divisies||[]).find(x=>x.id===d.id); if(!vd) continue;
+    const bf=(d.fases||[]).find(f=>f.type==='bracket');
+    const vbf=(vd.fases||[]).find(f=>f.type==='bracket');
+    if(bf&&vbf) bf.gestart=vbf.gestart;
+  }
+}
 async function opslaan(meldEl){
+  try{ await mergeVers(); }catch(e){ /* geen verse versie te halen — sla dan gewoon op */ }
   const body=JSON.stringify(T);
   const r=await fetch('/api/toernooi',{method:'POST',headers:hdr(),body});
   const j=await r.json();
-  if(r.ok) OPGESLAGEN=body;
+  if(r.ok){ OPGESLAGEN=body; tekenLog(); }
   if(meldEl) mgd(meldEl, r.ok?'Opgeslagen.':(j.fout||'Mislukt'), r.ok);
   return r.ok;
 }

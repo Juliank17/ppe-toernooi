@@ -23,6 +23,9 @@ module.exports = async (req, res) => {
     const pouleFase = (divisie.fases || []).find((f) => f.type === 'poule');
     const bracketFase = (divisie.fases || []).find((f) => f.type === 'bracket');
 
+    // Veiligheidssnapshot van de staat vóór deze actie (herstelbaar via beheer)
+    await store._set('backup:' + t.id, { t: Date.now(), actie: 'genereren ' + divisie.naam, data: t });
+
     // Bestaande wedstrijden van deze divisie opnieuw genereren
     t.wedstrijden = (t.wedstrijden || []).filter((w) => w.divisie !== divisieId);
 

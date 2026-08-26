@@ -10,7 +10,11 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       // Overzicht of één toernooi
       if (!isAdmin(req)) return json(res, 401, { fout: 'Geen toegang' });
-      const { id } = req.query || {};
+      const { id, backup } = req.query || {};
+      if (id && backup === '1') {
+        const b = await store._get('backup:' + id);
+        return b ? json(res, 200, b) : json(res, 404, { fout: 'Geen snapshot gevonden' });
+      }
       if (id) {
         const t = await store.haalToernooi(id);
         return t ? json(res, 200, t) : json(res, 404, { fout: 'Niet gevonden' });
