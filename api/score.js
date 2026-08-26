@@ -2,7 +2,7 @@
 'use strict';
 
 const store = require('../lib/store');
-const { magSchrijven } = require('../lib/auth');
+const { magSchrijven, isAdmin } = require('../lib/auth');
 const { leesBody, json } = require('../lib/http');
 const { werkBracketBij } = require('../lib/tournament');
 
@@ -44,8 +44,16 @@ module.exports = async (req, res) => {
     // Winnaars doorschuiven (en correcties/cascades verwerken)
     if (isKO) werkBracketBij(t.wedstrijden, bracketFase.id);
 
+    // Leesbaar logboek: wie deed wat, met teamnamen
+    const naamVan = (id) => { const tm = (t.teams || []).find((x) => x.id === id); return tm ? tm.naam : 'n.t.b.'; };
     t.log = t.log || [];
-    t.log.push({ t: Date.now(), actie: 'score', wedstrijd: wedstrijdId, door: magSchrijven(req, t) ? 'staff/admin' : '?' });
+    t.log.push({
+      t: Date.now(),
+      actie: leeg ? 'score gewist' : 'score',
+      tekst: `${w.label ? w.label + ': ' : ''}${naamVan(w.thuis)} ${leeg ? '—' : w.score.thuis + '-' + w.score.uit + (w.score.gp ? '*' : '')} ${naamVan(w.uit)}`,
+      door: isAdmin(req) ? 'admin' : 'personeel',
+    });
+    if (t.log.length > 200) t.log = t.log.slice(-200);
 
     await store.bewaarToernooi(t);
     return json(res, 200, { ok: true });

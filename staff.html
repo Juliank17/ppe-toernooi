@@ -17,6 +17,12 @@
   .ok-tag{color:#7ee08a;font-weight:700}
   .wis{color:#ff9b9e;font-size:.72rem;cursor:pointer;text-decoration:underline}
   .voortblok{border:1px solid #1e3c66;border-radius:10px;padding:10px 14px;min-width:170px;background:#0d2445}
+  .rooster{border-collapse:collapse;width:100%;table-layout:fixed;min-width:720px}
+  .rooster th,.rooster td{border:1px solid #1e3c66;padding:3px;vertical-align:top}
+  .rooster th{background:var(--navy-2);color:#fff;font-size:.72rem;padding:6px 4px}
+  .rooster td.tijd{background:var(--navy-2);color:var(--lime);font-family:'Anton';font-size:.8rem;width:52px;text-align:center}
+  .gchip{background:#fff;color:var(--navy);border-radius:5px;border-left:4px solid var(--lime);padding:3px 6px;font-size:.72rem;line-height:1.2;margin-bottom:2px}
+  .gchip small{display:block;color:#5b6b82;font-size:.58rem;text-transform:uppercase}
   @media (max-width:640px){
     .scorein{width:100%}
     .scorein input{flex:1;min-width:0;padding:12px 4px}
@@ -45,6 +51,7 @@
   <div id="app" class="verborgen">
     <div class="tabs">
       <button data-tab="scores" class="actief">Scores</button>
+      <button data-tab="rooster">Schema</button>
       <button data-tab="standen">Standen</button>
       <button data-tab="aanmelden">Check-in</button>
     </div>
@@ -62,6 +69,8 @@
       </div>
       <div id="scorelijst"></div>
     </div>
+
+    <div id="tab-rooster" class="verborgen"><div id="roosterwrap"><div class="kaart">Laden…</div></div></div>
 
     <div id="tab-standen" class="verborgen"><div id="standenlijst"><div class="kaart">Laden…</div></div></div>
 
@@ -102,9 +111,33 @@ function melding(el,tekst,ok){ el.innerHTML = tekst?`<div class="melding ${ok?'o
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('actief',x===b));
-  ['scores','standen','aanmelden'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
+  ['scores','rooster','standen','aanmelden'].forEach(t=>toon('tab-'+t,t===b.dataset.tab));
   if(b.dataset.tab==='standen') laadStanden();
+  if(b.dataset.tab==='rooster') tekenRooster();
 });
+
+/* --- Schema (alleen lezen): rooster zoals het planbord --- */
+function divKleurVan(divId){ const i=(DATA.divisies||[]).findIndex(d=>d.id===divId); return PALET[(i<0?0:i)%PALET.length]; }
+function tekenRooster(){
+  const doel=document.getElementById('roosterwrap');
+  const ws=(DATA.wedstrijden||[]).filter(w=>w.baan&&w.tijd);
+  if(!ws.length){ doel.innerHTML='<div class="kaart">Nog geen schema ingepland.</div>'; return; }
+  const banen=(DATA.banen||[]).filter(b=>ws.some(w=>w.baan===b.id));
+  const tijden=[...new Set(ws.map(w=>w.tijd))].sort((a,b)=>String(a).localeCompare(String(b)));
+  let h='<div class="kaart" style="overflow-x:auto;padding:10px"><p class="mini" style="margin:0 0 8px">Alleen-lezen overzicht — het schema wijzigen kan alleen de organisatie.</p><table class="rooster"><tr><th>Tijd</th>'
+    + banen.map(b=>`<th>${esc(b.naam)}</th>`).join('')+'</tr>';
+  for(const t of tijden){
+    h+=`<tr><td class="tijd">${esc(t)}</td>`;
+    for(const b of banen){
+      const hier=ws.filter(w=>w.tijd===t&&w.baan===b.id);
+      h+='<td>'+hier.map(w=>`<div class="gchip" style="border-left-color:${divKleurVan(w.divisie)}">
+        <small>${esc(divNaam(w.divisie))} · ${esc(w.groep==='ko'?(w.label||'knock-out'):(pouleNaam(w)||''))}</small>
+        ${esc(w.thuis)} — ${esc(w.uit)}${w.score?` <b>${w.score.thuis}-${w.score.uit}${w.score.gp?'*':''}</b>`:''}</div>`).join('')+'</td>';
+    }
+    h+='</tr>';
+  }
+  doel.innerHTML=h+'</table></div>';
+}
 
 /* --- Standen: poules + knock-outverloop (zelfde bron als de live-pagina) --- */
 async function laadStanden(){
@@ -220,11 +253,20 @@ function tekenScores(){
         <div class="teams" ${w.voorlopig?'style="color:#8494ab;font-style:italic"':''}>${esc(w.thuis)} — ${esc(w.uit)}</div></div>
       ${w.voorlopig
         ? '<span class="mini" style="color:#8494ab">nog te bepalen</span>'
+        : (w.id===gpVraag
+        ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+             <span class="mini" style="color:#feca57;font-weight:700">Gelijk (${gpScore.t}-${gpScore.u}) — vink aan wie het beslissende punt won:</span>
+             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+               <button class="btn" style="margin:0;padding:9px 12px" onclick="gpKies('${w.id}','thuis')">✓ ${esc(w.thuis)}</button>
+               <button class="btn" style="margin:0;padding:9px 12px" onclick="gpKies('${w.id}','uit')">✓ ${esc(w.uit)}</button>
+               <button class="btn sec" style="margin:0;padding:9px 12px" onclick="gpVraag=null;tekenScores()">annuleer</button>
+             </div>
+           </div>`
         : `<div class="scorein">
         <input type="number" min="0" inputmode="numeric" id="s_t_${w.id}" value="${w.score?w.score.thuis:''}" placeholder="${esc(kort(w.thuis))}">
         <input type="number" min="0" inputmode="numeric" id="s_u_${w.id}" value="${w.score?w.score.uit:''}" placeholder="${esc(kort(w.uit))}">
         <button class="btn" onclick="bewaarScore('${w.id}')" title="${klaar?'Score wijzigen':'Score opslaan'}">✓</button>
-      </div>`}
+      </div>`)}
     </div>`;
   };
   const tijden = [...new Set(ws.filter(w=>w.tijd).map(w=>w.tijd))].sort((a,b)=>String(a).localeCompare(String(b)));
@@ -263,17 +305,26 @@ async function toggleAanwezig(teamId, aanwezig){
   tekenCheckin();
 }
 
-let flitsId=null;
+let flitsId=null, gpVraag=null, gpScore=null;
 async function bewaarScore(wid){
   const t = document.getElementById('s_t_'+wid).value;
   const u = document.getElementById('s_u_'+wid).value;
   if(t===''||u==='') return;
-  // Gelijkspel in de knock-out? Dan beslist het golden point — vraag wie dat won.
+  // Gelijkspel in de knock-out? Toon keuzeknoppen: wie won het golden point?
   const wed = DATA.wedstrijden.find(x=>x.id===wid);
-  const score = {thuis:+t,uit:+u};
-  if(wed && wed.groep==='ko' && score.thuis===score.uit){
-    score.gp = confirm(`Gelijkspel ${t}-${u} — het golden point beslist.\n\nOK  =  ${wed.thuis} won het beslissende punt\nAnnuleren  =  ${wed.uit} won het beslissende punt`) ? 'thuis' : 'uit';
+  if(wed && wed.groep==='ko' && +t===+u){
+    gpVraag=wid; gpScore={t:+t,u:+u};
+    tekenScores();
+    return;
   }
+  await verstuurScore(wid, {thuis:+t,uit:+u});
+}
+async function gpKies(wid,kant){
+  const s={thuis:gpScore.t,uit:gpScore.u,gp:kant};
+  gpVraag=null; gpScore=null;
+  await verstuurScore(wid, s);
+}
+async function verstuurScore(wid, score){
   const r = await fetch('/api/score',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:DATA.id,wedstrijdId:wid,score})});
   if(r.ok){
@@ -343,6 +394,8 @@ setInterval(async ()=>{
     if(JSON.stringify(nieuw)===JSON.stringify(DATA)) return; // niets veranderd
     DATA=nieuw;
     tekenVoortgang(); tekenScores(); tekenCheckin(); stelKnockoutVoor();
+    if(!document.getElementById('tab-rooster').classList.contains('verborgen')) tekenRooster();
+    if(!document.getElementById('tab-standen').classList.contains('verborgen')) laadStanden();
   }catch(e){ /* stil — volgende poging over 10s */ }
 }, 10000);
 </script>

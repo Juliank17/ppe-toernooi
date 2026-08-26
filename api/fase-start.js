@@ -3,7 +3,7 @@
 'use strict';
 
 const store = require('../lib/store');
-const { magSchrijven } = require('../lib/auth');
+const { magSchrijven, isAdmin } = require('../lib/auth');
 const { leesBody, json, uid, cfgVan } = require('../lib/http');
 const { teamOpPositie, kwalificatieVolgorde, seedVolgorde, vermijdEigenPoule, werkBracketBij } = require('../lib/tournament');
 
@@ -29,6 +29,8 @@ module.exports = async (req, res) => {
         if (w.fase === bracketFase.id) { w.thuis = null; w.uit = null; w.score = null; w.status = 'gepland'; }
       }
       bracketFase.gestart = false;
+      t.log = t.log || [];
+      t.log.push({ t: Date.now(), actie: 'knock-out teruggedraaid', tekst: divisie.naam, door: isAdmin(req) ? 'admin' : 'personeel' });
       await store.bewaarToernooi(t);
       return json(res, 200, { ok: true, teruggedraaid: true });
     }
@@ -97,6 +99,10 @@ module.exports = async (req, res) => {
 
     // Byes (lege plekken in ronde 1) stromen meteen door naar ronde 2
     werkBracketBij(t.wedstrijden, bracketFase.id);
+
+    t.log = t.log || [];
+    t.log.push({ t: Date.now(), actie: 'knock-out gestart', tekst: divisie.naam, door: isAdmin(req) ? 'admin' : 'personeel' });
+    if (t.log.length > 200) t.log = t.log.slice(-200);
 
     await store.bewaarToernooi(t);
     return json(res, 200, { ok: true, slots });

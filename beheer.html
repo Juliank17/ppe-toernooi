@@ -34,6 +34,7 @@
 </style>
 </head>
 <body>
+<div id="opslagstatus" style="display:none;position:fixed;top:10px;right:12px;z-index:60;font-size:.75rem;font-weight:700;padding:5px 12px;border-radius:999px"></div>
 <header class="kop">
   <a class="terug" href="/admin.html">← Alle toernooien</a>
   <div class="logo" style="margin-top:6px">PRIME PADEL EVENTS</div>
@@ -100,6 +101,12 @@
         <div id="koinstel"></div>
         <p class="mini" style="color:#5b6b82">Zo werkt de plaatsing: de beste geplaatsten over álle poules stromen door (eerst alle nrs 1, dan alle nrs 2, dan de beste nrs 3, enz.). In de bracket speelt de <strong>beste tegen de zwakste</strong> (nr. 1 tegen de laagst geplaatste), en de topgeplaatsten staan in verschillende helften zodat ze elkaar pas laat treffen. Wijzig je de grootte? Genereer daarna opnieuw.</p>
       </div>
+
+      <details class="kaart">
+        <summary>Logboek — Alle Wijzigingen</summary>
+        <p class="mini" style="color:#5b6b82">Elke score-invoer, correctie en fase-actie, nieuwste bovenaan (max. 200 bewaard).</p>
+        <div id="logboek" class="mini"></div>
+      </details>
 
       <div class="kaart">
         <h3>Wedstrijden genereren</h3>
@@ -196,7 +203,7 @@ async function laad(){
   el('titel').textContent = T.naam;
   el('subtitel').textContent = [T.datum, T.locatie].filter(Boolean).join(' · ');
   toon('app',true);
-  vulGegevens(); tekenSponsoren(); tekenBanen(); tekenKnockout(); tekenGenereer(); tekenTeams();
+  vulGegevens(); tekenSponsoren(); tekenBanen(); tekenKnockout(); tekenGenereer(); tekenTeams(); tekenLog();
   OPGESLAGEN = JSON.stringify(T);
   const tabParam = new URLSearchParams(location.search).get('tab');
   if(tabParam) openTab(tabParam);
@@ -766,6 +773,28 @@ function tekenDelen(){
     <p class="mini" style="color:#5b6b82">Deel de spelers-link vrij; de personeel-link + PIN alleen met je medewerkers.</p>
   </div>`;
 }
+
+/* ---- Logboek ---- */
+function tekenLog(){
+  const regels=(T.log||[]).slice(-50).reverse().map(e=>{
+    const tijd=new Date(e.t).toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const wat=e.tekst || (e.wedstrijd?('wedstrijd '+e.wedstrijd):'');
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--grijs)">
+      <span style="color:#8494ab">${tijd}</span> · <b>${esc(e.actie)}</b>${wat?' — '+esc(wat):''}${e.door?` <span style="color:#8494ab">(${esc(e.door)})</span>`:''}</div>`;
+  }).join('');
+  el('logboek').innerHTML = regels || '<p class="mini">Nog geen wijzigingen gelogd.</p>';
+}
+
+/* ---- Opslag-indicator: laat continu zien of alles is opgeslagen ---- */
+setInterval(()=>{
+  const s=el('opslagstatus'); if(!s) return;
+  if(!T){ s.style.display='none'; return; }
+  const vuil = JSON.stringify(T)!==OPGESLAGEN;
+  s.style.display='block';
+  s.textContent = vuil ? '● Niet-opgeslagen wijzigingen' : '✓ Alles opgeslagen';
+  s.style.background = vuil ? '#8a5a00' : '#1c5c2a';
+  s.style.color = vuil ? '#ffe2a8' : '#bff0c7';
+}, 1200);
 
 /* ---- Opslaan (hele toernooi) ---- */
 async function opslaan(meldEl){
